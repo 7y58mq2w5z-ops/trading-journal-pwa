@@ -373,7 +373,7 @@ function openDetail(t){
     fillForm(t);
     const formEl = document.getElementById('tradeForm');
     formEl?.scrollIntoView({behavior:'smooth', block:'start'});
-    formEl?.querySelector('input[name="date"]');// focus removed
+    formEl?.querySelector('input[name="date"]')?.focus();
   });
 
   // Close actions
