@@ -1,7 +1,8 @@
-/* Local-first Trading Journal (IndexedDB) - v4
-   - Fix: Detail image fullscreen toggle (click to enter/exit)
-   - Feature: Month dropdown next to sort (filter by YYYY-MM)
-*/
+/* Trading Journal - v5
+ * - Fix: Detail image click now always zooms (Fullscreen API with CSS fallback)
+ * - UI: Wider search box, smaller sort/month selects
+ * - UI: Month dropdown '전체(모든 월)' → '전체' and narrower width
+ */
 
 // ---------- Tiny IndexedDB helper ----------
 const DB_NAME = 'journal-db';
@@ -24,47 +25,37 @@ function openDB() {
   });
 }
 
-function idbGet(id) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const req = tx.objectStore(STORE_NAME).get(id);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
+function idbGet(id) { return new Promise((resolve, reject) => {
+  const tx = db.transaction(STORE_NAME, 'readonly');
+  const req = tx.objectStore(STORE_NAME).get(id);
+  req.onsuccess = () => resolve(req.result);
+  req.onerror = () => reject(req.error);
+});}
 
-function idbAdd(trade) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).add(trade).onsuccess = (e) => resolve(e.target.result);
-    tx.onerror = () => reject(tx.error);
-  });
-}
+function idbAdd(trade) { return new Promise((resolve, reject) => {
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  tx.objectStore(STORE_NAME).add(trade).onsuccess = (e) => resolve(e.target.result);
+  tx.onerror = () => reject(tx.error);
+});}
 
-function idbPut(trade) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).put(trade).onsuccess = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
+function idbPut(trade) { return new Promise((resolve, reject) => {
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  tx.objectStore(STORE_NAME).put(trade).onsuccess = () => resolve();
+  tx.onerror = () => reject(tx.error);
+});}
 
-function idbDelete(id) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).delete(id).onsuccess = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
+function idbDelete(id) { return new Promise((resolve, reject) => {
+  const tx = db.transaction(STORE_NAME, 'readwrite');
+  tx.objectStore(STORE_NAME).delete(id).onsuccess = () => resolve();
+  tx.onerror = () => reject(tx.error);
+});}
 
-function idbAll() {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const req = tx.objectStore(STORE_NAME).getAll();
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
+function idbAll() { return new Promise((resolve, reject) => {
+  const tx = db.transaction(STORE_NAME, 'readonly');
+  const req = tx.objectStore(STORE_NAME).getAll();
+  req.onsuccess = () => resolve(req.result);
+  req.onerror = () => reject(req.error);
+});}
 
 // ---------- Helpers ----------
 const $ = (sel) => document.querySelector(sel);
@@ -74,9 +65,7 @@ function formatPnL(t) { return (Number(t.sell_price||0) - Number(t.buy_price||0)
 function rate(t) { if (!t.buy_price) return 0; return ((Number(t.sell_price||0) / Number(t.buy_price||0)) - 1) * 100; }
 
 function fmtDateNoYear(s){ if(!s) return ''; return s.slice(5); } // YYYY-MM-DD -> MM-DD
-function fmtNumber(n){
-  try { return Number(n).toLocaleString('ko-KR'); } catch { return String(n); }
-}
+function fmtNumber(n){ try { return Number(n).toLocaleString('ko-KR'); } catch { return String(n); } }
 function fmtPrice(n){
   const v = Number(n||0);
   const hasFraction = Math.abs(v - Math.trunc(v)) > 1e-6;
@@ -89,23 +78,56 @@ function fmtMan(n){
   if (v === 0) return '0';
   return (sign<0?'-':'') + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + '만';
 }
-function monthKeyOf(dateStr){ // 'YYYY-MM-DD' -> 'YYYY-MM'
-  if (!dateStr || dateStr.length < 7) return '';
-  return dateStr.slice(0,7);
-}
-function monthLabel(key){ // '2025-10' -> '2025년 10월'
-  if (!key) return '전체';
-  const [y,m] = key.split('-');
-  return `${y}년 ${String(Number(m))}월`;
+function monthKeyOf(dateStr){ if (!dateStr || dateStr.length < 7) return ''; return dateStr.slice(0,7); }
+function monthLabel(key){ if (!key) return '전체'; const [y,m] = key.split('-'); return `${y}년 ${String(Number(m))}월`; }
+
+// ---------- Zoom CSS fallback ----------
+function ensureZoomStyles(){
+  if (document.getElementById('zoom-style')) return;
+  const css = `
+  .img-zoomed{
+    position: fixed !important; inset: 0 !important;
+    margin: 0 !important; background: rgba(0,0,0,.85) !important;
+    object-fit: contain !important; max-width: 100vw !important; max-height: 100vh !important;
+    width: 100vw !important; height: 100vh !important; z-index: 9999 !important;
+    cursor: zoom-out !important;
+  }`;
+  const s = document.createElement('style');
+  s.id = 'zoom-style'; s.textContent = css;
+  document.head.appendChild(s);
 }
 
+async function tryFullscreen(el){
+  try{
+    if (document.fullscreenElement === el || document.webkitFullscreenElement === el) {
+      if (document.exitFullscreen) await document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      return true;
+    } else {
+      if (el.requestFullscreen) { await el.requestFullscreen(); return true; }
+      else if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); return true; }
+    }
+  }catch(e){ /* ignore */ }
+  return false;
+}
+
+function toggleZoomFallback(el){
+  ensureZoomStyles();
+  if (el.classList.contains('img-zoomed')) {
+    el.classList.remove('img-zoomed');
+  } else {
+    document.querySelectorAll('.img-zoomed').forEach(x=>x.classList.remove('img-zoomed'));
+    el.classList.add('img-zoomed');
+  }
+}
+
+// ---------- Form helpers ----------
 function clearForm() {
   const form = $('#tradeForm');
   form.reset();
   form.id.value = '';
   document.querySelectorAll('input[name="tags[]"]').forEach(ch => ch.checked = false);
   $('#deleteTrade').classList.add('hidden');
-  // 파일 라벨 텍스트 초기화
   form.querySelectorAll('input[type="file"]').forEach((inp)=>{
     const span = inp.closest('label')?.querySelector('span.btn-secondary');
     if (span) span.textContent = '파일 선택';
@@ -127,7 +149,6 @@ function fillForm(t) {
     document.querySelectorAll('input[name="tags[]"]').forEach(ch => { if (set.has(ch.value)) ch.checked = true; });
   }
   $('#deleteTrade').classList.toggle('hidden', !t.id);
-  // 이미지가 저장되어 있으면 라벨 텍스트로 표시
   [{key:'image1'},{key:'image2'}].forEach(({key})=>{
     const input = form.querySelector(`input[name="${key}"]`);
     const span = input?.closest('label')?.querySelector('span.btn-secondary');
@@ -135,28 +156,24 @@ function fillForm(t) {
   });
 }
 
-function fileToDataURL(file) {
-  return new Promise((resolve) => {
-    if (!file) return resolve(null);
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.readAsDataURL(file);
-  });
-}
+function fileToDataURL(file) { return new Promise((resolve) => {
+  if (!file) return resolve(null);
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result);
+  reader.readAsDataURL(file);
+});}
 
 // ---------- Month dropdown ----------
 async function populateMonthSelect() {
-  // 컨테이너(검색/정렬 박스) 찾기
   const toolbar = $('#searchInput')?.parentElement || null;
   if (!toolbar) return;
 
-  // 없으면 생성
   let monthSel = $('#monthSelect');
   if (!monthSel) {
     monthSel = document.createElement('select');
     monthSel.id = 'monthSelect';
-    monthSel.className = 'input w-44';
-    // 정렬 select 뒤에 삽입
+    monthSel.className = 'input';
+    monthSel.style.width = '7.5rem';
     toolbar.appendChild(monthSel);
     monthSel.addEventListener('change', renderList);
   }
@@ -167,7 +184,7 @@ async function populateMonthSelect() {
 
   monthSel.innerHTML = '';
   const optAll = document.createElement('option');
-  optAll.value = 'all'; optAll.textContent = '전체(모든 월)';
+  optAll.value = 'all'; optAll.textContent = '전체';
   monthSel.appendChild(optAll);
   months.forEach(key=>{
     const opt = document.createElement('option');
@@ -176,8 +193,13 @@ async function populateMonthSelect() {
     monthSel.appendChild(opt);
   });
 
-  // 기존 선택 유지
   if ([...monthSel.options].some(o=>o.value===cur)) monthSel.value = cur;
+
+  // widen search, shrink sort/month
+  const search = $('#searchInput');
+  const sort = $('#sortSelect');
+  if (search) search.style.flex = '1 1 auto';
+  if (sort) sort.style.width = '7.5rem';
 }
 
 // ---------- List render ----------
@@ -204,7 +226,6 @@ async function renderList() {
     return 0;
   });
 
-  // === 5개 컬럼: 날짜 - 종목 - 수익률 - 손익 - 태그 ===
   const table = [`<table class="min-w-full text-sm"><thead class="text-slate-500"><tr>
     <th class="py-2 pr-3 nowrap">날짜</th>
     <th class="py-2 pr-3 nowrap">종목</th>
@@ -227,7 +248,6 @@ async function renderList() {
   table.push(`</tbody></table>`);
   $('#listContainer').innerHTML = table.join('');
 
-  // Row click -> detail
   $('#listContainer').querySelectorAll('tr[data-id]').forEach(tr=>{
     tr.addEventListener('click', async ()=>{
       const id = Number(tr.getAttribute('data-id'));
@@ -236,12 +256,9 @@ async function renderList() {
     });
   });
 
-  // Chart: daily sum trend (전체 데이터 기준으로 유지)
+  // Chart (overall data)
   const byDate = {};
-  for (const t of data) {
-    if (!t.date) continue;
-    byDate[t.date] = (byDate[t.date] || 0) + formatPnL(t);
-  }
+  for (const t of data) if (t.date) byDate[t.date] = (byDate[t.date] || 0) + formatPnL(t);
   const days = Object.keys(byDate).sort();
   const labels = days.map(fmtDateNoYear);
   const values = days.map(d => byDate[d]);
@@ -256,7 +273,6 @@ async function renderList() {
 }
 
 // ---------- Detail Modal ----------
-
 function openDetail(t){
   const pnl = formatPnL(t);
   const r = rate(t);
@@ -293,65 +309,45 @@ function openDetail(t){
       </div>
     </div>`;
   $('#detailContent').innerHTML = html;
-  const modal = $('#detailModal');
-  modal.classList.add('show');
+  $('#detailModal').classList.add('show');
 
-  function bindFsToggle(id){
+  function attachZoomHandler(id){
     const el = document.getElementById(id);
     if (!el) return;
     el.style.cursor = 'zoom-in';
     el.addEventListener('click', async (ev)=>{
       ev.stopPropagation();
-      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
-      if (fsEl === el) {
-        if (document.exitFullscreen) { try { await document.exitFullscreen(); } catch(e){} }
-        else if (document.webkitExitFullscreen) { document.webkitExitFullscreen(); }
-        el.style.cursor = 'zoom-in';
-      } else {
-        if (el.requestFullscreen) { await el.requestFullscreen(); }
-        else if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); }
-        el.style.cursor = 'zoom-out';
-      }
-    });
-    ['fullscreenchange','webkitfullscreenchange'].forEach(evt=>{
-      document.addEventListener(evt, ()=>{
-        const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
-        el.style.cursor = (fsEl === el) ? 'zoom-out' : 'zoom-in';
-      });
+      const ok = await tryFullscreen(el);
+      if (!ok) toggleZoomFallback(el);
     });
   }
-  bindFsToggle('img1'); bindFsToggle('img2');
+  attachZoomHandler('img1'); attachZoomHandler('img2');
+
+  // ESC로 CSS zoom 해제
+  document.addEventListener('keydown', (e)=>{
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.img-zoomed').forEach(x=>x.classList.remove('img-zoomed'));
+    }
+  }, { once:true });
 }
 
-function closeDetail(){
-  const modal = $('#detailModal');
-  modal.classList.remove('show');
-}
-
-document.addEventListener('click', (e)=>{
-  if (e.target && e.target.id === 'detailClose') closeDetail();
-});
-
-document.getElementById('detailModal').addEventListener('click', (e)=>{
-  if (e.target.id === 'detailModal') closeDetail();
-});
+function closeDetail(){ $('#detailModal').classList.remove('show'); }
+document.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'detailClose') closeDetail(); });
+document.getElementById('detailModal').addEventListener('click', (e)=>{ if (e.target.id === 'detailModal') closeDetail(); });
 
 // ---------- Calendar ----------
 let calendar;
 
 function recomputeCalendarEvents(all) {
   const sums = {};
-  all.forEach(t => {
-    if (!t.date) return;
-    sums[t.date] = (sums[t.date] || 0) + formatPnL(t);
-  });
+  all.forEach(t => { if (t.date) sums[t.date] = (sums[t.date] || 0) + formatPnL(t); });
 
   const events = [];
   const dates = Object.keys(sums).sort();
   for (const d of dates) {
     const val = sums[d] || 0;
     events.push({
-      title: fmtMan(Math.round(val)), // 만원 단위로 간결 표기
+      title: fmtMan(Math.round(val)),
       start: d,
       allDay: true,
       color: val >= 0 ? '#dc2626' : '#2563eb',
@@ -364,21 +360,17 @@ function recomputeCalendarEvents(all) {
     const max = new Date(dates[dates.length - 1]);
     for (let cur = new Date(min); cur <= max; cur.setDate(cur.getDate()+7)) {
       const weekStart = new Date(cur);
-      weekStart.setDate(weekStart.getDate() - ((weekStart.getDay()+6)%7)); // Monday
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekEnd.getDate()+6);
+      weekStart.setDate(weekStart.getDate() - ((weekStart.getDay()+6)%7));
+      const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate()+6);
 
       const keyStart = weekStart.toISOString().slice(0,10);
       const keyEnd = weekEnd.toISOString().slice(0,10);
 
       let sum = 0;
-      for (const d of Object.keys(sums)) {
-        if (d >= keyStart && d <= keyEnd) sum += sums[d];
-      }
-      const saturday = new Date(weekStart);
-      saturday.setDate(saturday.getDate()+5);
+      for (const d of Object.keys(sums)) if (d >= keyStart && d <= keyEnd) sum += sums[d];
+      const saturday = new Date(weekStart); saturday.setDate(saturday.getDate()+5);
       events.push({
-        title: fmtMan(Math.round(sum)), // "주간" 제거
+        title: fmtMan(Math.round(sum)),
         start: saturday.toISOString().slice(0,10),
         allDay: true,
         color: '#111827',
@@ -397,8 +389,8 @@ async function initCalendar() {
     locale: 'ko',
     dayCellDidMount: (arg)=>{
       const d = arg.date.getDay();
-      if (d === 0) { arg.el.style.color = '#dc2626'; }   // Sunday red
-      if (d === 6) { arg.el.style.color = '#2563eb'; }   // Saturday blue
+      if (d === 0) { arg.el.style.color = '#dc2626'; }
+      if (d === 6) { arg.el.style.color = '#2563eb'; }
     },
     dateClick: async (info) => { renderCalendarList(info.dateStr); },
     eventClick: async (info) => {
@@ -438,7 +430,6 @@ async function renderCalendarList(dateStr) {
   out.push(`</tbody></table></div>`);
   const host = document.getElementById('calendarList');
   host.innerHTML = out.join('');
-  // 심볼 클릭 → 상세
   host.querySelectorAll('.link-symbol').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = Number(btn.getAttribute('data-id'));
@@ -474,7 +465,6 @@ async function renderWeekList(weekStart) {
   out.push(`</tbody></table></div>`);
   const host = document.getElementById('calendarList');
   host.innerHTML = out.join('');
-  // 심볼 클릭 → 상세
   host.querySelectorAll('.link-symbol').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = Number(btn.getAttribute('data-id'));
@@ -510,7 +500,7 @@ async function importJSON(file) {
   const obj = JSON.parse(text);
   if (!obj || !Array.isArray(obj.trades)) return;
   for (const t of obj.trades) {
-    delete t.id; // prevent id collision
+    delete t.id;
     await idbAdd(t);
   }
   await populateMonthSelect();
@@ -537,14 +527,11 @@ window.addEventListener('beforeinstallprompt', (e)=>{
 (async function init() {
   await openDB();
 
-  // Tabs
   $$('.tab-btn').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
   switchTab('list');
 
-  // Month dropdown
   await populateMonthSelect();
 
-  // File input: 선택된 파일명을 버튼 텍스트로 표시
   const form = $('#tradeForm');
   ['image1','image2'].forEach(name=>{
     const input = form.querySelector(`input[name="${name}"]`);
@@ -556,7 +543,6 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     });
   });
 
-  // List controls
   $('#searchInput').addEventListener('input', renderList);
   $('#sortSelect').addEventListener('change', renderList);
   $('#exportBtn').addEventListener('click', exportJSON);
@@ -564,12 +550,9 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     if (e.target.files && e.target.files[0]) importJSON(e.target.files[0]);
   });
 
-  // Form submit
   $('#tradeForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
     const f = e.target;
-
-    // Read previous record if editing (to keep images when no new file is chosen)
     let prev = null;
     const editId = f.id.value ? Number(f.id.value) : null;
     if (editId) prev = await idbGet(editId);
@@ -594,13 +577,8 @@ window.addEventListener('beforeinstallprompt', (e)=>{
       image2: img2,
       created_at: prev ? prev.created_at : new Date().toISOString()
     };
-    if (payload.id) {
-      await idbPut(payload);
-      alert('수정 완료');
-    } else {
-      await idbAdd(payload);
-      alert('저장 완료');
-    }
+    if (payload.id) { await idbPut(payload); alert('수정 완료'); }
+    else { await idbAdd(payload); alert('저장 완료'); }
     clearForm();
     await populateMonthSelect();
     await renderList();
@@ -622,7 +600,6 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     }
   });
 
-  // Calendar
   await initCalendar();
 })();
 
