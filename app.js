@@ -1,17 +1,19 @@
-/* Trading Journal - v11 (defensive boot)
- * 목적: '아예 열리지 않음' 문제 진단/해결용 안전 가드 추가
- * - 전역 오류 핸들러 + 초기 로깅(window.__APP_VERSION__='v11')
- * - 필수 DOM 요소/라이브러리(FullCalendar 등) 유무 체크 후 우아한 무시
- * - 캘린더/모달/탭/리스트 이벤트 바인딩 전부 null-세이프 가드
- * - 차트/간단분석 완전 제거
- * - 이미지 라벨 클릭(삭제/변경), 편집 버튼 흐름은 유지
+/* Trading Journal - v12 (null-safe + self-healing UI)
+ * 콘솔 오류 원인 해결:
+ *  - renderList에서 #searchInput / #sortSelect 가 없을 때 null.value 접근 에러 → 전부 null-safe
+ *  - setupImageManage에서 label>span.btn-secondary 없을 때 querySelector 에러 →
+ *    없으면 자동으로 대체 버튼을 생성하여(파일 입력 바로 뒤) 동일 동작 제공
+ *  - 초기화 순서 보강 및 풍부한 로그
+ * 추가:
+ *  - '간단 분석' 완전 제거/숨김
+ *  - 상세 모달: '닫기' 아래 '편집' 강제 표시 + 편집 클릭 시 입력 폼 즉시 표시/자동채움
+ *  - 캘린더 라이브러리 미로딩 시 우아한 비활성화
  */
 
 // -------------------- Global guards --------------------
-window.__APP_VERSION__ = 'v11';
+window.__APP_VERSION__ = 'v12';
 console.log('[Journal] boot', window.__APP_VERSION__);
 
-// 모든 예외를 콘솔로 노출
 window.addEventListener('error', (e)=>{
   console.error('[Journal] Uncaught error:', e?.error || e?.message || e);
 });
@@ -24,16 +26,11 @@ const DB_NAME = 'journal-db';
 const STORE_NAME = 'trades';
 let db;
 
-function hasIndexedDB(){
+function openDB() {
   if (!('indexedDB' in window)) {
     console.warn('[Journal] indexedDB not supported');
-    return false;
+    return Promise.resolve(null);
   }
-  return true;
-}
-
-function openDB() {
-  if (!hasIndexedDB()) return Promise.resolve(null);
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, 1);
     req.onupgradeneeded = (e) => {
@@ -169,48 +166,69 @@ async function compressFileToDataURL(file, {maxSide=2000, quality=0.85} = {}){
 function clearForm() {
   const form = $('#tradeForm'); if (!form) return;
   form.reset();
-  form.id.value = '';
+  if (form.id) form.id.value = '';
   document.querySelectorAll('input[name="tags[]"]').forEach(ch => ch.checked = false);
-  const delBtn = $('#deleteTrade'); if (delBtn) delBtn.classList.add('hidden');
+  $('#deleteTrade')?.classList.add('hidden');
   form.dataset.clearImage1 = '0'; form.dataset.clearImage2 = '0';
   form.querySelectorAll('input[type="file"]').forEach((inp)=>{
+    // 라벨이 없을 수도 있으므로 아무 것도 안 함
     const span = inp.closest('label')?.querySelector('span.btn-secondary');
     if (span) span.textContent = '파일 선택';
+    const proxy = inp.nextElementSibling;
+    if (proxy && proxy.classList?.contains('img-proxy')) proxy.textContent = '파일 선택';
   });
 }
 function fillForm(t) {
   const form = $('#tradeForm'); if (!form) return;
-  form.id.value = t.id || '';
-  form.date.value = t.date || '';
-  form.symbol.value = t.symbol || '';
-  form.qty.value = t.qty ?? '';
-  form.buy_price.value = t.buy_price ?? '';
-  form.sell_price.value = t.sell_price ?? '';
-  form.comment.value = t.comment || '';
+  if (form.id) form.id.value = t.id || '';
+  if (form.date) form.date.value = t.date || '';
+  if (form.symbol) form.symbol.value = t.symbol || '';
+  if (form.qty) form.qty.value = t.qty ?? '';
+  if (form.buy_price) form.buy_price.value = t.buy_price ?? '';
+  if (form.sell_price) form.sell_price.value = t.sell_price ?? '';
+  if (form.comment) form.comment.value = t.comment || '';
   document.querySelectorAll('input[name="tags[]"]').forEach(ch => { ch.checked = false; });
   if (t.tags) {
     const set = new Set(String(t.tags).split(',').map(s=>s.trim()).filter(Boolean));
     document.querySelectorAll('input[name="tags[]"]').forEach(ch => { if (set.has(ch.value)) ch.checked = true; });
   }
-  const delBtn = $('#deleteTrade'); if (delBtn) delBtn.classList.toggle('hidden', !t.id);
+  $('#deleteTrade')?.classList.toggle('hidden', !t.id);
   form.dataset.clearImage1 = '0'; form.dataset.clearImage2 = '0';
   ['image1','image2'].forEach((key)=>{
     const input = form.querySelector(`input[name="${key}"]`);
-    const span = input?.closest('label')?.querySelector('span.btn-secondary');
-    if (span) span.textContent = t[key] ? '이미지 저장됨' : '파일 선택';
+    if (!input) return;
+    const span = input.closest('label')?.querySelector('span.btn-secondary');
+    const proxy = input.nextElementSibling?.classList?.contains('img-proxy') ? input.nextElementSibling : null;
+    const text = t[key] ? '이미지 저장됨' : '파일 선택';
+    if (span) span.textContent = text;
+    if (proxy) proxy.textContent = text;
   });
+}
+function ensureImageProxyButton(input){
+  // 파일 input 바로 뒤에 라벨이 없으면, 대체 버튼을 만들어 준다
+  const labelSpan = input.closest('label')?.querySelector('span.btn-secondary');
+  if (labelSpan) return labelSpan; // 기존 라벨 사용
+  // 이미 만들어둔 프록시가 있으면 반환
+  if (input.nextElementSibling && input.nextElementSibling.classList?.contains('img-proxy')) return input.nextElementSibling;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn-secondary img-proxy';
+  btn.textContent = '파일 선택';
+  btn.style.marginLeft = '0.5rem';
+  input.insertAdjacentElement('afterend', btn);
+  return btn;
 }
 function setupImageManage() {
   const form = $('#tradeForm'); if (!form) return;
   ['image1','image2'].forEach(name=>{
     const input = form.querySelector(`input[name="${name}"]`); if (!input) return;
-    const span = input.closest('label')?.querySelector('span.btn-secondary'); if (!span) return;
-    span.style.cursor = 'pointer';
-    span.addEventListener('click', ()=>{
-      const txt = span.textContent || '';
+    const btnLike = ensureImageProxyButton(input); // 라벨 또는 프록시 버튼
+    btnLike.style.cursor = 'pointer';
+    btnLike.addEventListener('click', ()=>{
+      const txt = btnLike.textContent || '';
       if (txt.includes('이미지 저장됨') || (txt && txt !== '파일 선택' && txt !== '삭제됨')) {
         const del = confirm('이미지를 삭제할까요?\n확인 = 삭제, 취소 = 이미지 변경');
-        if (del) { span.textContent = '삭제됨'; input.value = ''; form.dataset[name==='image1'?'clearImage1':'clearImage2']='1'; }
+        if (del) { btnLike.textContent = '삭제됨'; input.value = ''; form.dataset[name==='image1'?'clearImage1':'clearImage2']='1'; }
         else { form.dataset[name==='image1'?'clearImage1':'clearImage2']='0'; input.click(); }
       } else {
         input.click();
@@ -218,7 +236,7 @@ function setupImageManage() {
     });
     input.addEventListener('change', ()=>{
       const f = input.files && input.files[0];
-      span.textContent = f ? f.name : '파일 선택';
+      btnLike.textContent = f ? f.name : '파일 선택';
       form.dataset[name==='image1'?'clearImage1':'clearImage2'] = f ? '0' : form.dataset[name==='image1'?'clearImage1':'clearImage2'];
     });
   });
@@ -261,7 +279,7 @@ async function renderList() {
     const t = (el.textContent||'').trim(); if (t && t.includes('간단 분석')) kill(el);
   });
 
-  const listHost = $('#listContainer'); if (!listHost) return;
+  const listHost = $('#listContainer'); if (!listHost) { console.warn('[Journal] #listContainer missing'); return; }
   const q = ($('#searchInput')?.value||'').trim().toLowerCase();
   const sortKey = $('#sortSelect')?.value || 'date_desc';
   const monthKey = $('#monthSelect') ? $('#monthSelect').value : 'all';
@@ -429,7 +447,7 @@ async function renderCalendarList(dateStr) {
   const all = await idbAll();
   const rows = all.filter(t => t.date === dateStr).sort((a,b)=> (a.created_at||'').localeCompare(b.created_at||''));
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
-  const out = [`<div class="card"><h3 class="font-semibold">${dateStr} 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,
+  const out = [`<div class="card"><h3 class="font-semibold">${dateStr} 매매 (합계: ${total>=0?`<span class='pnl-pos'>{${fmtNumber(Math.round(total))}}</span>`:`<span class='pnl-neg'>{${fmtNumber(Math.round(total))}}</span>`})</h3>`,
                `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr>
                  <th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];
   for (const t of rows) {
@@ -521,6 +539,7 @@ async function importJSON(file) {
     await openDB();
     $$('.tab-btn').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
     switchTab('list');
+
     await populateMonthSelect();
     setupImageManage();
 
@@ -538,24 +557,24 @@ async function importJSON(file) {
       e.preventDefault();
       const f = e.target;
       let prev = null;
-      const editId = f.id.value ? Number(f.id.value) : null;
+      const editId = f.id?.value ? Number(f.id.value) : null;
       if (editId) prev = await idbGet(editId);
       const clear1 = f.dataset.clearImage1 === '1';
       const clear2 = f.dataset.clearImage2 === '1';
-      const newImg1 = await compressFileToDataURL(f.image1.files[0], {maxSide:2000, quality:0.85});
-      const newImg2 = await compressFileToDataURL(f.image2.files[0], {maxSide:2000, quality:0.85});
+      const newImg1 = await compressFileToDataURL(f.image1?.files?.[0], {maxSide:2000, quality:0.85});
+      const newImg2 = await compressFileToDataURL(f.image2?.files?.[0], {maxSide:2000, quality:0.85});
       const img1 = newImg1 ?? (clear1 ? null : (prev ? prev.image1 : null));
       const img2 = newImg2 ?? (clear2 ? null : (prev ? prev.image2 : null));
       const tags = Array.from(document.querySelectorAll('input[name="tags[]"]:checked')).map(x=>x.value).join(',');
       const payload = {
         id: editId || undefined,
-        date: f.date.value,
-        symbol: f.symbol.value.trim(),
-        qty: Number(f.qty.value||0),
-        buy_price: Number(f.buy_price.value||0),
-        sell_price: Number(f.sell_price.value||0),
+        date: f.date?.value || '',
+        symbol: (f.symbol?.value || '').trim(),
+        qty: Number(f.qty?.value||0),
+        buy_price: Number(f.buy_price?.value||0),
+        sell_price: Number(f.sell_price?.value||0),
         tags,
-        comment: f.comment.value,
+        comment: f.comment?.value || '',
         image1: img1,
         image2: img2,
         created_at: prev ? prev.created_at : new Date().toISOString()
@@ -569,7 +588,7 @@ async function importJSON(file) {
 
     $('#resetForm')?.addEventListener('click', clearForm);
     $('#deleteTrade')?.addEventListener('click', async ()=>{
-      const id = Number($('#tradeForm')?.id.value);
+      const id = Number($('#tradeForm')?.id?.value);
       if (id && confirm('이 거래를 삭제할까요?')) {
         await idbDelete(id);
         clearForm(); await populateMonthSelect(); await renderList(); await refreshCalendar(); switchTab('list');
@@ -579,7 +598,7 @@ async function importJSON(file) {
     await initCalendar();
     await renderList();
 
-    console.log('[Journal] init done');
+    console.log('[Journal] init done (v12)');
   } catch (err) {
     console.error('[Journal] fatal init error:', err);
     alert('스크립트 초기화 중 오류가 발생했어요. 콘솔을 확인해주세요.');
