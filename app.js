@@ -1,4 +1,3 @@
-let lastOpenedDetail = null;
 /* Trading Journal - v6.1 (detail '편집' button + edit flow)
  * - Adds an '편집' button **right below** the existing 닫기 button in the detail modal
  * - On click, immediately opens the 입력(폼) 탭 and pre-fills values for editing
@@ -157,27 +156,7 @@ function clearForm() {
   form.querySelectorAll('input[type="file"]').forEach((inp)=>{
     const span = inp.closest('label')?.querySelector('span.btn-secondary');
     if (span) span.textContent = '파일 선택';
-    setFormMode('create');
-});
-}
-
-// --- Toggle form mode: 'create' | 'edit' ---
-function setFormMode(mode) {
-  const saveBtn   = document.getElementById('saveBtn') || document.querySelector('.btn-save[type="submit"]');
-  const cancelBtn = document.getElementById('cancelBtn') || document.getElementById('resetForm');
-  const deleteBtn = document.getElementById('deleteTrade');
-  if (!saveBtn || !cancelBtn || !deleteBtn) return;
-  if (mode === 'edit') {
-    saveBtn.textContent = '수정';
-    cancelBtn.textContent = '취소';
-    deleteBtn.classList.remove('hidden');
-  } else {
-    saveBtn.textContent = '저장';
-    cancelBtn.textContent = '새로 입력';
-    deleteBtn.classList.add('hidden');
-  }
-  const form = document.getElementById('tradeForm');
-  if (form) form.dataset.mode = mode;
+  });
 }
 
 function fillForm(t) {
@@ -312,7 +291,6 @@ async function renderList() {
 
 // ---------- Detail Modal ----------
 function openDetail(t){
-  lastOpenedDetail = t;
   const pnl = formatPnL(t);
   const r = rate(t);
   const buyAmount = (Number(t.buy_price||0) * Number(t.qty||0));
@@ -341,6 +319,10 @@ function openDetail(t){
       <div>
         <div class="text-slate-500 text-sm">Tags</div>
         <div class="font-medium">${t.tags||''}</div>
+      </div>
+      <div style="grid-column: 1 / -1;">
+        <div class="text-slate-500 text-sm">코멘트</div>
+        <div class="mt-1 p-2 rounded border border-slate-200 bg-slate-50 whitespace-pre-wrap">${t.comment||''}</div>
       </div>
       <div class="detail-images" style="display:flex;gap:.75rem;">
         ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
@@ -393,18 +375,20 @@ function openDetail(t){
     formTabBtn?.click();
     // prefill
     fillForm(t);
-    setFormMode('edit');
     const formEl = document.getElementById('tradeForm');
     formEl?.scrollIntoView({behavior:'smooth', block:'start'});
-    // (focus removed) formEl?.querySelector('input[name="date"]').focus();
+    // formEl?.querySelector('input[name="date"]')?.focus();
   });
 
-  // Close actions
+  // Close actions (robust: bind directly to elements, not delegated/once)
   function closeDetail(){ modal.classList.remove('show'); }
-  document.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'detailClose') closeDetail(); }, { once:true });
-  document.getElementById('detailModal').addEventListener('click', (e)=>{ if (e.target.id === 'detailModal') closeDetail(); }, { once:true });
-}
+  const closeBtnEl = document.getElementById('detailClose');
+  if (closeBtnEl) {
+    closeBtnEl.onclick = (e)=>{ e.stopPropagation(); closeDetail(); };
+  }
+  modal.addEventListener('click', (e)=>{ if (e.target === modal) closeDetail(); });
 
+}
 // ---------- Calendar ----------
 let calendar;
 
@@ -485,14 +469,17 @@ async function renderCalendarList(dateStr) {
   const rows = all.filter(t => t.date === dateStr).sort((a,b)=> (a.created_at||'').localeCompare(b.created_at||''));
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
   const out = [`<div class="card"><h3 class="font-semibold">${dateStr} 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,
-               `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">태그</th></tr></thead><tbody>`];
+               `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr>
+                 <th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];
   for (const t of rows) {
     const pnl = formatPnL(t), r = rate(t);
     out.push(`<tr class="border-t border-slate-100">
       <td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button></td>
       <td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
       <td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
-      <td class="py-1 pr-3 nowrap">${t.tags||''}</td></tr>`);
+      <td class="py-1 pr-3 nowrap">${fmtNumber(t.qty)}</td>
+      <td class="py-1 pr-3 nowrap">${fmtPrice(t.buy_price)}</td>
+      <td class="py-1 pr-3 nowrap">${fmtPrice(t.sell_price)}</td></tr>`);
   }
   out.push(`</tbody></table></div>`);
   const host = document.getElementById('calendarList');
@@ -525,7 +512,9 @@ async function renderWeekList(weekStart) {
       <td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button></td>
       <td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
       <td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
-      <td class="py-1 pr-3 nowrap">${t.tags||''}</td></tr>`);
+      <td class="py-1 pr-3 nowrap">${fmtNumber(t.qty)}</td>
+      <td class="py-1 pr-3 nowrap">${fmtPrice(t.buy_price)}</td>
+      <td class="py-1 pr-3 nowrap">${fmtPrice(t.sell_price)}</td></tr>`);
   }
   out.push(`</tbody></table></div>`);
   const host = document.getElementById('calendarList');
@@ -644,9 +633,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
       image2: img2,
       created_at: prev ? prev.created_at : new Date().toISOString()
     };
-    if (payload.id) { await idbPut(payload); alert('수정 완료');
-    openDetail(payload);
- }
+    if (payload.id) { await idbPut(payload); alert('수정 완료'); }
     else { await idbAdd(payload); alert('저장 완료'); }
     clearForm();
     await populateMonthSelect();
@@ -655,13 +642,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     switchTab('list');
   });
 
-  (document.getElementById('cancelBtn') || document.getElementById('resetForm'))?.addEventListener('click', () => {
-  const form = document.getElementById('tradeForm');
-  const isEditing = !!(form && form.id && form.id.value);
-  clearForm();
-  if (isEditing && lastOpenedDetail) openDetail(lastOpenedDetail);
-});
-
+  $('#resetForm').addEventListener('click', clearForm);
 
   $('#deleteTrade').addEventListener('click', async ()=>{
     const id = Number($('#tradeForm').id.value);
