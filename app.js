@@ -1,7 +1,8 @@
-/* Trading Journal - v6.1d (based on your working v6.1)
- * Changes:
- * 1) Edit → no focus on date (no calendar popup). We don't focus anything.
- * 2) While editing, show a '취소' button next to existing buttons; clicking it cancels edit (clear + back to list).
+/* Trading Journal - v6.1e (based on working v6.1 + v6.1d)
+ * Changes vs v6.1:
+ * 1) Edit 클릭 시 날짜 포커스 주지 않음(달력 자동팝업 방지) — 유지
+ * 2) 편집 모드에서 '취소' 버튼 표시 — 유지
+ * 3) 상세보기 모달에서 버튼 배치: 기존 '닫기' 버튼 바로 아래에 '편집' 버튼을 추가 (하단에 중복 버튼 생성 안 함)
  */
 
 // --- DB helpers (same as v6.1 minimal) ---
@@ -18,6 +19,7 @@ function idbDelete(id){return new Promise((resolve,reject)=>{const tx=db.transac
 function idbAll(){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE_NAME,'readonly');const r=tx.objectStore(STORE_NAME).getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error);});}
 
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+
 function formatPnL(t){return (Number(t.sell_price||0)-Number(t.buy_price||0))*Number(t.qty||0);}
 function rate(t){if(!t.buy_price) return 0; return ((Number(t.sell_price||0)/Number(t.buy_price||0))-1)*100;}
 function fmtDateNoYear(s){if(!s) return ''; return s.slice(5);} function fmtNumber(n){try{return Number(n).toLocaleString('ko-KR');}catch{return String(n);}}
@@ -40,7 +42,7 @@ function fillForm(t){const form=$('#tradeForm');if(!form)return;form.id.value=t.
 async function populateMonthSelect(){const toolbar=$('#searchInput')?.parentElement||null;if(!toolbar)return;let m=$('#monthSelect');if(!m){m=document.createElement('select');m.id='monthSelect';m.className='input';m.style.width='7.5rem';toolbar.appendChild(m);m.addEventListener('change',renderList);}const data=await idbAll();const months=Array.from(new Set(data.map(t=>monthKeyOf(t.date)).filter(Boolean))).sort().reverse();const cur=m.value||'all';m.innerHTML='';const a=document.createElement('option');a.value='all';a.textContent='전체';m.appendChild(a);months.forEach(key=>{const o=document.createElement('option');o.value=key;o.textContent=monthLabel(key);m.appendChild(o);});if([...m.options].some(o=>o.value===cur))m.value=cur;const s=$('#searchInput');const sort=$('#sortSelect');if(s)s.style.flex='1 1 auto';if(sort)sort.style.width='7.5rem';}
 async function renderList(){const q=$('#searchInput')?.value?.trim()?.toLowerCase?.()||'';const sortKey=$('#sortSelect')?.value||'date_desc';const monthKey=$('#monthSelect')?$('#monthSelect').value:'all';const data=await idbAll();let rows=data.filter(t=>{const tag=(t.tags||'').toLowerCase();const sym=(t.symbol||'').toLowerCase();const okQ=!q||tag.includes(q)||sym.includes(q);const okM=monthKey==='all'||monthKeyOf(t.date)===monthKey;return okQ&&okM;});rows.sort((a,b)=>{if(sortKey==='date_desc')return(b.date||'').localeCompare(a.date||'');if(sortKey==='date_asc')return(a.date||'').localeCompare(b.date||'');if(sortKey==='pnl_desc')return formatPnL(b)-formatPnL(a);if(sortKey==='pnl_asc')return formatPnL(a)-formatPnL(b);return 0;});const table=[`<table class="min-w-full text-sm"><thead class="text-slate-500"><tr><th class="py-2 pr-3 nowrap">날짜</th><th class="py-2 pr-3 nowrap">종목</th><th class="py-2 pr-3 nowrap text-right">수익률</th><th class="py-2 pr-3 nowrap text-right">손익</th><th class="py-2 pr-3 nowrap">태그</th></tr></thead><tbody>`];for(const t of rows){const pnl=formatPnL(t),r=rate(t);table.push(`<tr class="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" data-id="${t.id}"><td class="py-1 pr-3 nowrap">${fmtDateNoYear(t.date)}</td><td class="py-1 pr-3 nowrap">${t.symbol||''}</td><td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td><td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td><td class="py-1 pr-3 nowrap">${t.tags||''}</td></tr>`);}table.push(`</tbody></table>`);$('#listContainer').innerHTML=table.join('');$('#listContainer').querySelectorAll('tr[data-id]').forEach(tr=>{tr.addEventListener('click', async ()=>{const id=Number(tr.getAttribute('data-id'));const rec=await idbGet(id);if(rec)openDetail(rec);});});}
 
-/* Detail modal: edit(no focus) + cancel support */
+/* Detail modal: place '편집' right under existing '닫기' button (no duplicate close at bottom) */
 function openDetail(t){
   const pnl=formatPnL(t), r=rate(t), buyAmount=(Number(t.buy_price||0)*Number(t.qty||0));
   const html=`
@@ -55,24 +57,36 @@ function openDetail(t){
         ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
         ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
       </div>
-      <div class="mt-4 flex flex-col items-end gap-2">
-        <button id="detailClose" type="button" class="btn-secondary">닫기</button>
-        <button id="detailEdit"  type="button" class="btn-primary">편집</button>
-      </div>
     </div>`;
-  $('#detailContent').innerHTML=html; const modal=$('#detailModal'); modal.classList.add('show');
+  $('#detailContent').innerHTML=html;
+  const modal=$('#detailModal'); modal.classList.add('show');
 
+  // zoom
   ['img1','img2'].forEach(id=>{const el=document.getElementById(id); if(!el)return; el.style.cursor='zoom-in'; el.addEventListener('click', async (ev)=>{ev.stopPropagation(); const ok=await tryFullscreen(el); if(!ok) toggleZoomFallback(el);});});
+
+  // close: existing button in template
   function closeDetail(){ modal.classList.remove('show'); }
-  document.getElementById('detailClose')?.addEventListener('click', closeDetail);
+  const closeBtn=document.getElementById('detailClose');
+  closeBtn?.addEventListener('click', closeDetail, { once:true });
   $('#detailModal').addEventListener('click',(e)=>{ if(e.target.id==='detailModal') closeDetail(); },{once:true});
 
-  document.getElementById('detailEdit')?.addEventListener('click', ()=>{
+  // create/edit button and insert JUST UNDER the existing close button
+  let editBtn=document.getElementById('detailEdit');
+  if (editBtn) editBtn.remove();
+  editBtn=document.createElement('button');
+  editBtn.id='detailEdit'; editBtn.type='button'; editBtn.className='btn-primary';
+  editBtn.textContent='편집';
+  editBtn.style.display='inline-block';
+  editBtn.style.marginTop='4px'; // ~1mm
+  closeBtn?.insertAdjacentElement('afterend', editBtn);
+
+  // edit → open form & prefill (NO focus anywhere → calendar won't open)
+  editBtn.addEventListener('click', ()=>{
     closeDetail();
     (document.querySelector('[data-tab="form"]')||document.querySelector('[data-tab="input"]'))?.click();
-    fillForm(t);          // fill values
-    setEditUI(true);      // show delete + cancel
-    // no focus anywhere → no calendar popup
+    fillForm(t);
+    setEditUI(true); // show delete + cancel
+    // no focus to avoid calendar popup
   });
 }
 
@@ -81,8 +95,8 @@ let calendar;
 function recomputeCalendarEvents(all){const sums={};all.forEach(t=>{if(t.date)sums[t.date]=(sums[t.date]||0)+formatPnL(t);});const events=[];const dates=Object.keys(sums).sort();for(const d of dates){const val=sums[d]||0;events.push({title:fmtMan(Math.round(val)),start:d,allDay:true,color:val>=0?'#dc2626':'#2563eb',extendedProps:{kind:'daily',dateStr:d}});}if(dates.length){const min=new Date(dates[0]),max=new Date(dates[dates.length-1]);for(let cur=new Date(min);cur<=max;cur.setDate(cur.getDate()+7)){const ws=new Date(cur);ws.setDate(ws.getDate()-((ws.getDay()+6)%7));const we=new Date(ws);we.setDate(we.getDate()+6);const s=ws.toISOString().slice(0,10),e=we.toISOString().slice(0,10);let sum=0;for(const d of Object.keys(sums)) if(d>=s&&d<=e) sum+=sums[d];const sat=new Date(ws);sat.setDate(sat.getDate()+5);events.push({title:fmtMan(Math.round(sum)),start:sat.toISOString().slice(0,10),allDay:true,color:'#111827',extendedProps:{kind:'weekly',weekStart:s}});}}return events;}
 async function initCalendar(){const el=document.getElementById('calendar'); if(!el||typeof FullCalendar==='undefined')return;calendar=new FullCalendar.Calendar(el,{initialView:'dayGridMonth',height:'auto',locale:'ko',dayCellDidMount:(arg)=>{const d=arg.date.getDay();if(d===0)arg.el.style.color='#dc2626';if(d===6)arg.el.style.color='#2563eb';},dateClick:async(info)=>{renderCalendarList(info.dateStr);},eventClick:async(info)=>{const ep=info.event.extendedProps||{};if(ep.kind==='daily'&&ep.dateStr)renderCalendarList(ep.dateStr);else if(ep.kind==='weekly'&&ep.weekStart)renderWeekList(ep.weekStart);}});calendar.render();await refreshCalendar();}
 async function refreshCalendar(){if(!calendar)return;const all=await idbAll();const events=recomputeCalendarEvents(all);calendar.removeAllEvents();calendar.addEventSource(events);}
-async function renderCalendarList(dateStr){const all=await idbAll();const rows=all.filter(t=>t.date===dateStr).sort((a,b)=>(a.created_at||'').localeCompare(b.created_at||''));const total=rows.reduce((acc,t)=>acc+formatPnL(t),0);const out=[`<div class="card"><h3 class="font-semibold">${dateStr} 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,`<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];for(const t of rows){const pnl=formatPnL(t),r=rate(t);out.push(`<tr class="border-t border-slate-100"><td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button></td><td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td><td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos'>${fmtNumber(Math.round(pnl))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(pnl))}</span>`}</td><td class="py-1 pr-3 nowrap">${fmtNumber(t.qty)}</td><td class="py-1 pr-3 nowrap">${fmtPrice(t.buy_price)}</td><td class="py-1 pr-3 nowrap">${fmtPrice(t.sell_price)}</td></tr>`);}out.push(`</tbody></table></div>`);const host=document.getElementById('calendarList');host.innerHTML=out.join('');host.querySelectorAll('.link-symbol').forEach(btn=>{btn.addEventListener('click', async ()=>{const id=Number(btn.getAttribute('data-id'));const rec=await idbGet(id);if(rec)openDetail(rec);});});}
-async function renderWeekList(weekStart){const ws=new Date(weekStart),we=new Date(ws);we.setDate(we.getDate()+6);const sKey=ws.toISOString().slice(0,10),eKey=we.toISOString().slice(0,10);const all=await idbAll();const rows=all.filter(t=>t.date>=sKey&&t.date<=eKey).sort((a,b)=>(a.date||'').localeCompare(b.date||''));const total=rows.reduce((acc,t)=>acc+formatPnL(t),0);const out=[`<div class="card"><h3 class="font-semibold">${sKey} ~ ${eKey} 주간 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,`<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr><th class="py-1 pr-3 nowrap">날짜</th><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];for(const t of rows){const pnl=formatPnL(t),r=rate(t);out.push(`<tr class="border-t border-slate-100"><td class="py-1 pr-3 nowrap">${fmtDateNoYear(t.date)}</td><td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button></td><td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td><td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos'>${fmtNumber(Math.round(pnl))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(pnl))}</span>`}</td><td class="py-1 pr-3 nowrap">${fmtNumber(t.qty)}</td><td class="py-1 pr-3 nowrap">${fmtPrice(t.buy_price)}</td><td class="py-1 pr-3 nowrap">${fmtPrice(t.sell_price)}</td></tr>`);}out.push(`</tbody></table></div>`);const host=document.getElementById('calendarList');host.innerHTML=out.join('');host.querySelectorAll('.link-symbol').forEach(btn=>{btn.addEventListener('click', async ()=>{const id=Number(btn.getAttribute('data-id'));const rec=await idbGet(id);if(rec)openDetail(rec);});});}
+async function renderCalendarList(dateStr){const all=await idbAll();const rows=all.filter(t=>t.date===dateStr).sort((a,b)=>(a.created_at||'').localeCompare(b.created_at||''));const total=rows.reduce((acc,t)=>acc+formatPnL(t),0);const out=[`<div class="card"><h3 class="font-semibold">${dateStr} 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,`<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];for(const t of rows){const pnl=formatPnL(t),r=rate(t);out.push(`<tr class="border-t border-slate-100"><td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button></td><td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td><td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td><td class="py-1 pr-3 nowrap">${fmtNumber(t.qty)}</td><td class="py-1 pr-3 nowrap">${fmtPrice(t.buy_price)}</td><td class="py-1 pr-3 nowrap">${fmtPrice(t.sell_price)}</td></tr>`);}out.push(`</tbody></table></div>`);const host=document.getElementById('calendarList');host.innerHTML=out.join('');host.querySelectorAll('.link-symbol').forEach(btn=>{btn.addEventListener('click', async ()=>{const id=Number(btn.getAttribute('data-id'));const rec=await idbGet(id);if(rec)openDetail(rec);});});}
+async function renderWeekList(weekStart){const ws=new Date(weekStart),we=new Date(ws);we.setDate(we.getDate()+6);const sKey=ws.toISOString().slice(0,10),eKey=we.toISOString().slice(0,10);const all=await idbAll();const rows=all.filter(t=>t.date>=sKey&&t.date<=eKey).sort((a,b)=>(a.date||'').localeCompare(b.date||''));const total=rows.reduce((acc,t)=>acc+formatPnL(t),0);const out=[`<div class="card"><h3 class="font-semibold">${sKey} ~ ${eKey} 주간 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,`<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr><th class="py-1 pr-3 nowrap">날짜</th><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];for(const t of rows){const pnl=formatPnL(t),r=rate(t);out.push(`<tr class="border-t border-slate-100"><td class="py-1 pr-3 nowrap">${fmtDateNoYear(t.date)}</td><td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button></td><td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td><td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td><td class="py-1 pr-3 nowrap">${fmtNumber(t.qty)}</td><td class="py-1 pr-3 nowrap">${fmtPrice(t.buy_price)}</td><td class="py-1 pr-3 nowrap">${fmtPrice(t.sell_price)}</td></tr>`);}out.push(`</tbody></table></div>`);const host=document.getElementById('calendarList');host.innerHTML=out.join('');host.querySelectorAll('.link-symbol').forEach(btn=>{btn.addEventListener('click', async ()=>{const id=Number(btn.getAttribute('data-id'));const rec=await idbGet(id);if(rec)openDetail(rec);});});}
 
 // tabs/import/export/init
 function switchTab(name){$$('.card').forEach(sec=>sec.classList.add('hidden'));document.getElementById('tab-'+name)?.classList.remove('hidden');$$('.tab-btn').forEach(btn=>btn.classList.remove('tab-active'));document.querySelector(`[data-tab="${name}"]`)?.classList.add('tab-active');if(name==='calendar')refreshCalendar();if(name==='list')renderList();}
@@ -118,7 +132,7 @@ async function importJSON(file){const text=await file.text();const obj=JSON.pars
   ensureCancelButton()?.addEventListener('click', ()=>{ clearForm(); switchTab('list'); });
 
   await initCalendar(); await renderList();
-  console.log('Trading Journal JS loaded: v6.1d');
+  console.log('Trading Journal JS loaded: v6.1e');
 })();
 
 // simple image compression (same profile)
