@@ -342,6 +342,10 @@ function openDetail(t){
         <div class="text-slate-500 text-sm">Tags</div>
         <div class="font-medium">${t.tags||''}</div>
       </div>
+      <div style="grid-column: 1 / -1;">
+        <div class="text-slate-500 text-sm">코멘트</div>
+        <div class="mt-1 p-2 rounded border border-slate-200 bg-slate-50 whitespace-pre-wrap">${t.comment||''}</div>
+      </div>
       <div class="detail-images" style="display:flex;gap:.75rem;">
         ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
         ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
@@ -399,12 +403,15 @@ function openDetail(t){
     // (focus removed) formEl?.querySelector('input[name="date"]').focus();
   });
 
-  // Close actions
+  // Close actions (robust direct bindings so it works after returning from edit)
   function closeDetail(){ modal.classList.remove('show'); }
-  document.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'detailClose') closeDetail(); }, { once:true });
-  document.getElementById('detailModal').addEventListener('click', (e)=>{ if (e.target.id === 'detailModal') closeDetail(); }, { once:true });
-}
+  const closeBtnEl = document.getElementById('detailClose');
+  if (closeBtnEl) {
+    closeBtnEl.onclick = (e)=>{ e.preventDefault(); e.stopPropagation(); closeDetail(); };
+  }
+  modal.onclick = (e)=>{ if (e.target === modal) closeDetail(); };
 
+}
 // ---------- Calendar ----------
 let calendar;
 
@@ -646,13 +653,12 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     };
     if (payload.id) { await idbPut(payload); alert('수정 완료');
     openDetail(payload);
- }
-    else { await idbAdd(payload); alert('저장 완료'); }
+  } else { await idbAdd(payload); alert('저장 완료'); }
     clearForm();
     await populateMonthSelect();
     await renderList();
     await refreshCalendar();
-    switchTab('list');
+    if (!payload.id) switchTab('list');
   });
 
   (document.getElementById('cancelBtn') || document.getElementById('resetForm'))?.addEventListener('click', () => {
