@@ -1,3 +1,4 @@
+let lastOpenedDetail = null;
 /* Trading Journal - v6.1 (detail '편집' button + edit flow)
  * - Adds an '편집' button **right below** the existing 닫기 button in the detail modal
  * - On click, immediately opens the 입력(폼) 탭 and pre-fills values for editing
@@ -157,26 +158,6 @@ function clearForm() {
     const span = inp.closest('label')?.querySelector('span.btn-secondary');
     if (span) span.textContent = '파일 선택';
   });
-  setFormMode('create');
-}
-
-// --- form mode toggler (create/edit) ---
-function setFormMode(mode) {
-  const saveBtn   = document.getElementById('saveBtn');
-  const cancelBtn = document.getElementById('cancelBtn');
-  const deleteBtn = document.getElementById('deleteTrade');
-
-  if (!saveBtn || !cancelBtn || !deleteBtn) return;
-
-  if (mode === 'edit') {
-    saveBtn.textContent = '수정';
-    deleteBtn.classList.remove('hidden');
-    cancelBtn.textContent = '취소';
-  } else {
-    saveBtn.textContent = '저장';
-    deleteBtn.classList.add('hidden');
-    cancelBtn.textContent = '새로 입력';
-  }
 }
 
 function fillForm(t) {
@@ -310,7 +291,8 @@ async function renderList() {
 }
 
 // ---------- Detail Modal ----------
-function openDetail(t){
+function openDetail(t) {
+  lastOpenedDetail = t;
   const pnl = formatPnL(t);
   const r = rate(t);
   const buyAmount = (Number(t.buy_price||0) * Number(t.qty||0));
@@ -391,10 +373,9 @@ function openDetail(t){
     formTabBtn?.click();
     // prefill
     fillForm(t);
-    setFormMode('edit');
     const formEl = document.getElementById('tradeForm');
     formEl?.scrollIntoView({behavior:'smooth', block:'start'});
-    // // formEl?.querySelector('input[name="date"]')?.focus();
+    formEl?.querySelector('input[name="date"]')?.focus();
   });
 
   // Close actions
@@ -656,7 +637,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     switchTab('list');
   });
 
-  (document.getElementById('cancelBtn') || document.getElementById('resetForm'))?.addEventListener('click', clearForm);
+  $('#resetForm').addEventListener('click', clearForm);
 
   $('#deleteTrade').addEventListener('click', async ()=>{
     const id = Number($('#tradeForm').id.value);
