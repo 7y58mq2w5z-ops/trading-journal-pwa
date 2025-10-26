@@ -1,4 +1,7 @@
-/* Local-first Trading Journal (IndexedDB) - v3 customizations */
+/* Local-first Trading Journal (IndexedDB) - v4
+   - Fix: Detail image fullscreen toggle (click to enter/exit)
+   - Feature: Month dropdown next to sort (filter by YYYY-MM)
+*/
 
 // ---------- Tiny IndexedDB helper ----------
 const DB_NAME = 'journal-db';
@@ -86,6 +89,15 @@ function fmtMan(n){
   if (v === 0) return '0';
   return (sign<0?'-':'') + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + '만';
 }
+function monthKeyOf(dateStr){ // 'YYYY-MM-DD' -> 'YYYY-MM'
+  if (!dateStr || dateStr.length < 7) return '';
+  return dateStr.slice(0,7);
+}
+function monthLabel(key){ // '2025-10' -> '2025년 10월'
+  if (!key) return '전체';
+  const [y,m] = key.split('-');
+  return `${y}년 ${String(Number(m))}월`;
+}
 
 function clearForm() {
   const form = $('#tradeForm');
@@ -94,10 +106,7 @@ function clearForm() {
   document.querySelectorAll('input[name="tags[]"]').forEach(ch => ch.checked = false);
   $('#deleteTrade').classList.add('hidden');
   // 파일 라벨 텍스트 초기화
-  const l1 = form.querySelector('label[for="image1"] span.btn-secondary');
-  const l2 = form.querySelector('label[for="image2"] span.btn-secondary');
-  // 위 구조에서 for 속성이 없으므로 직접 찾아 처리
-  form.querySelectorAll('input[type="file"]').forEach((inp, idx)=>{
+  form.querySelectorAll('input[type="file"]').forEach((inp)=>{
     const span = inp.closest('label')?.querySelector('span.btn-secondary');
     if (span) span.textContent = '파일 선택';
   });
@@ -119,14 +128,10 @@ function fillForm(t) {
   }
   $('#deleteTrade').classList.toggle('hidden', !t.id);
   // 이미지가 저장되어 있으면 라벨 텍스트로 표시
-  const files = [
-    {key:'image1', has: !!t.image1},
-    {key:'image2', has: !!t.image2},
-  ];
-  files.forEach((fobj, i)=>{
-    const input = form.querySelector(`input[name="${fobj.key}"]`);
+  [{key:'image1'},{key:'image2'}].forEach(({key})=>{
+    const input = form.querySelector(`input[name="${key}"]`);
     const span = input?.closest('label')?.querySelector('span.btn-secondary');
-    if (span) span.textContent = fobj.has ? '이미지 저장됨' : '파일 선택';
+    if (span) span.textContent = t[key] ? '이미지 저장됨' : '파일 선택';
   });
 }
 
@@ -139,17 +144,56 @@ function fileToDataURL(file) {
   });
 }
 
+// ---------- Month dropdown ----------
+async function populateMonthSelect() {
+  // 컨테이너(검색/정렬 박스) 찾기
+  const toolbar = $('#searchInput')?.parentElement || null;
+  if (!toolbar) return;
+
+  // 없으면 생성
+  let monthSel = $('#monthSelect');
+  if (!monthSel) {
+    monthSel = document.createElement('select');
+    monthSel.id = 'monthSelect';
+    monthSel.className = 'input w-44';
+    // 정렬 select 뒤에 삽입
+    toolbar.appendChild(monthSel);
+    monthSel.addEventListener('change', renderList);
+  }
+
+  const data = await idbAll();
+  const months = Array.from(new Set(data.map(t=>monthKeyOf(t.date)).filter(Boolean))).sort().reverse();
+  const cur = monthSel.value || 'all';
+
+  monthSel.innerHTML = '';
+  const optAll = document.createElement('option');
+  optAll.value = 'all'; optAll.textContent = '전체(모든 월)';
+  monthSel.appendChild(optAll);
+  months.forEach(key=>{
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = monthLabel(key);
+    monthSel.appendChild(opt);
+  });
+
+  // 기존 선택 유지
+  if ([...monthSel.options].some(o=>o.value===cur)) monthSel.value = cur;
+}
+
 // ---------- List render ----------
 let chart;
 async function renderList() {
   const q = $('#searchInput').value.trim().toLowerCase();
   const sortKey = $('#sortSelect').value;
+  const monthKey = $('#monthSelect') ? $('#monthSelect').value : 'all';
 
   const data = await idbAll();
   let rows = data.filter(t => {
     const tagStr = (t.tags || '').toLowerCase();
     const sym = (t.symbol || '').toLowerCase();
-    return !q || tagStr.includes(q) || sym.includes(q);
+    const okQuery = !q || tagStr.includes(q) || sym.includes(q);
+    const okMonth = monthKey === 'all' || monthKeyOf(t.date) === monthKey;
+    return okQuery && okMonth;
   });
 
   rows.sort((a,b)=>{
@@ -160,7 +204,7 @@ async function renderList() {
     return 0;
   });
 
-  // === 사용자 요청에 따라 5개 컬럼으로 재구성: 날짜 - 종목 - 수익률 - 손익 - 태그 ===
+  // === 5개 컬럼: 날짜 - 종목 - 수익률 - 손익 - 태그 ===
   const table = [`<table class="min-w-full text-sm"><thead class="text-slate-500"><tr>
     <th class="py-2 pr-3 nowrap">날짜</th>
     <th class="py-2 pr-3 nowrap">종목</th>
@@ -185,14 +229,14 @@ async function renderList() {
 
   // Row click -> detail
   $('#listContainer').querySelectorAll('tr[data-id]').forEach(tr=>{
-    tr.addEventListener('click', async (ev)=>{
+    tr.addEventListener('click', async ()=>{
       const id = Number(tr.getAttribute('data-id'));
       const rec = await idbGet(id);
       if (rec) openDetail(rec);
     });
   });
 
-  // Chart: daily sum trend (원 단위 그대로, x축 축약)
+  // Chart: daily sum trend (전체 데이터 기준으로 유지)
   const byDate = {};
   for (const t of data) {
     if (!t.date) continue;
@@ -252,20 +296,31 @@ function openDetail(t){
   const modal = $('#detailModal');
   modal.classList.add('show');
 
-  function setupFS(id){
+  function bindFsToggle(id){
     const el = document.getElementById(id);
     if (!el) return;
+    el.style.cursor = 'zoom-in';
     el.addEventListener('click', async (ev)=>{
       ev.stopPropagation();
-      if (document.fullscreenElement) {
-        await document.exitFullscreen().catch(()=>{});
+      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      if (fsEl === el) {
+        if (document.exitFullscreen) { try { await document.exitFullscreen(); } catch(e){} }
+        else if (document.webkitExitFullscreen) { document.webkitExitFullscreen(); }
+        el.style.cursor = 'zoom-in';
       } else {
-        if (el.requestFullscreen) await el.requestFullscreen();
-        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        if (el.requestFullscreen) { await el.requestFullscreen(); }
+        else if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); }
+        el.style.cursor = 'zoom-out';
       }
     });
+    ['fullscreenchange','webkitfullscreenchange'].forEach(evt=>{
+      document.addEventListener(evt, ()=>{
+        const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+        el.style.cursor = (fsEl === el) ? 'zoom-out' : 'zoom-in';
+      });
+    });
   }
-  setupFS('img1'); setupFS('img2');
+  bindFsToggle('img1'); bindFsToggle('img2');
 }
 
 function closeDetail(){
@@ -323,7 +378,7 @@ function recomputeCalendarEvents(all) {
       const saturday = new Date(weekStart);
       saturday.setDate(saturday.getDate()+5);
       events.push({
-        title: fmtMan(Math.round(sum)), // "주간" 제거, 색상만 다르게
+        title: fmtMan(Math.round(sum)), // "주간" 제거
         start: saturday.toISOString().slice(0,10),
         allDay: true,
         color: '#111827',
@@ -385,7 +440,7 @@ async function renderCalendarList(dateStr) {
   host.innerHTML = out.join('');
   // 심볼 클릭 → 상세
   host.querySelectorAll('.link-symbol').forEach(btn=>{
-    btn.addEventListener('click', async (ev)=>{
+    btn.addEventListener('click', async ()=>{
       const id = Number(btn.getAttribute('data-id'));
       const rec = await idbGet(id);
       if (rec) openDetail(rec);
@@ -421,7 +476,7 @@ async function renderWeekList(weekStart) {
   host.innerHTML = out.join('');
   // 심볼 클릭 → 상세
   host.querySelectorAll('.link-symbol').forEach(btn=>{
-    btn.addEventListener('click', async (ev)=>{
+    btn.addEventListener('click', async ()=>{
       const id = Number(btn.getAttribute('data-id'));
       const rec = await idbGet(id);
       if (rec) openDetail(rec);
@@ -458,6 +513,7 @@ async function importJSON(file) {
     delete t.id; // prevent id collision
     await idbAdd(t);
   }
+  await populateMonthSelect();
   await renderList();
   await refreshCalendar();
   alert('가져오기 완료');
@@ -484,6 +540,9 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   // Tabs
   $$('.tab-btn').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
   switchTab('list');
+
+  // Month dropdown
+  await populateMonthSelect();
 
   // File input: 선택된 파일명을 버튼 텍스트로 표시
   const form = $('#tradeForm');
@@ -543,6 +602,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
       alert('저장 완료');
     }
     clearForm();
+    await populateMonthSelect();
     await renderList();
     await refreshCalendar();
     switchTab('list');
@@ -555,6 +615,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     if (id && confirm('이 거래를 삭제할까요?')) {
       await idbDelete(id);
       clearForm();
+      await populateMonthSelect();
       await renderList();
       await refreshCalendar();
       switchTab('list');
