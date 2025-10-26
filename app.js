@@ -1,4 +1,4 @@
-/* Local-first Trading Journal (IndexedDB) */
+/* Local-first Trading Journal (IndexedDB) - v3 customizations */
 
 // ---------- Tiny IndexedDB helper ----------
 const DB_NAME = 'journal-db';
@@ -67,8 +67,8 @@ function idbAll() {
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-function formatPnL(t) { return (t.sell_price - t.buy_price) * t.qty; }
-function rate(t) { if (!t.buy_price) return 0; return ((t.sell_price / t.buy_price) - 1) * 100; }
+function formatPnL(t) { return (Number(t.sell_price||0) - Number(t.buy_price||0)) * Number(t.qty||0); }
+function rate(t) { if (!t.buy_price) return 0; return ((Number(t.sell_price||0) / Number(t.buy_price||0)) - 1) * 100; }
 
 function fmtDateNoYear(s){ if(!s) return ''; return s.slice(5); } // YYYY-MM-DD -> MM-DD
 function fmtNumber(n){
@@ -79,6 +79,13 @@ function fmtPrice(n){
   const hasFraction = Math.abs(v - Math.trunc(v)) > 1e-6;
   return hasFraction ? v.toLocaleString('ko-KR', {minimumFractionDigits:2, maximumFractionDigits:2}) : v.toLocaleString('ko-KR');
 }
+// 만원 단위(한 자리 소수, 둘째자리 버림) 표시: -35000 => -3.5만
+function fmtMan(n){
+  const sign = n < 0 ? -1 : 1;
+  const v = Math.floor(Math.abs(n) / 1000) / 10; // 10000 단위를 한 자리로, 둘째자리 버림
+  if (v === 0) return '0';
+  return (sign<0?'-':'') + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + '만';
+}
 
 function clearForm() {
   const form = $('#tradeForm');
@@ -86,6 +93,14 @@ function clearForm() {
   form.id.value = '';
   document.querySelectorAll('input[name="tags[]"]').forEach(ch => ch.checked = false);
   $('#deleteTrade').classList.add('hidden');
+  // 파일 라벨 텍스트 초기화
+  const l1 = form.querySelector('label[for="image1"] span.btn-secondary');
+  const l2 = form.querySelector('label[for="image2"] span.btn-secondary');
+  // 위 구조에서 for 속성이 없으므로 직접 찾아 처리
+  form.querySelectorAll('input[type="file"]').forEach((inp, idx)=>{
+    const span = inp.closest('label')?.querySelector('span.btn-secondary');
+    if (span) span.textContent = '파일 선택';
+  });
 }
 
 function fillForm(t) {
@@ -103,6 +118,16 @@ function fillForm(t) {
     document.querySelectorAll('input[name="tags[]"]').forEach(ch => { if (set.has(ch.value)) ch.checked = true; });
   }
   $('#deleteTrade').classList.toggle('hidden', !t.id);
+  // 이미지가 저장되어 있으면 라벨 텍스트로 표시
+  const files = [
+    {key:'image1', has: !!t.image1},
+    {key:'image2', has: !!t.image2},
+  ];
+  files.forEach((fobj, i)=>{
+    const input = form.querySelector(`input[name="${fobj.key}"]`);
+    const span = input?.closest('label')?.querySelector('span.btn-secondary');
+    if (span) span.textContent = fobj.has ? '이미지 저장됨' : '파일 선택';
+  });
 }
 
 function fileToDataURL(file) {
@@ -135,15 +160,13 @@ async function renderList() {
     return 0;
   });
 
+  // === 사용자 요청에 따라 5개 컬럼으로 재구성: 날짜 - 종목 - 수익률 - 손익 - 태그 ===
   const table = [`<table class="min-w-full text-sm"><thead class="text-slate-500"><tr>
     <th class="py-2 pr-3 nowrap">날짜</th>
-    <th class="py-2 pr-3 nowrap">수익률</th>
-    <th class="py-2 pr-3 nowrap">손익</th>
     <th class="py-2 pr-3 nowrap">종목</th>
-    <th class="py-2 pr-3 nowrap">수량</th>
-    <th class="py-2 pr-3 nowrap">매수가</th>
-    <th class="py-2 pr-3 nowrap">매도가</th>
-    <th class="py-2 pr-3 nowrap">Tags</th>
+    <th class="py-2 pr-3 nowrap text-right">수익률</th>
+    <th class="py-2 pr-3 nowrap text-right">손익</th>
+    <th class="py-2 pr-3 nowrap">태그</th>
   </tr></thead><tbody>`];
 
   for (const t of rows) {
@@ -151,12 +174,9 @@ async function renderList() {
     const r = rate(t);
     table.push(`<tr class="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" data-id="${t.id}">
       <td class="py-1 pr-3 nowrap">${fmtDateNoYear(t.date)}</td>
-      <td class="py-1 pr-3 nowrap">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
-      <td class="py-1 pr-3 nowrap">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
       <td class="py-1 pr-3 nowrap">${t.symbol||''}</td>
-      <td class="py-1 pr-3 nowrap">${fmtNumber(t.qty||0)}</td>
-      <td class="py-1 pr-3 nowrap">${fmtPrice(t.buy_price)}</td>
-      <td class="py-1 pr-3 nowrap">${fmtPrice(t.sell_price)}</td>
+      <td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
+      <td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
       <td class="py-1 pr-3 nowrap">${t.tags||''}</td>
     </tr>`);
   }
@@ -165,14 +185,14 @@ async function renderList() {
 
   // Row click -> detail
   $('#listContainer').querySelectorAll('tr[data-id]').forEach(tr=>{
-    tr.addEventListener('click', async ()=>{
+    tr.addEventListener('click', async (ev)=>{
       const id = Number(tr.getAttribute('data-id'));
       const rec = await idbGet(id);
       if (rec) openDetail(rec);
     });
   });
 
-  // Chart: daily sum trend
+  // Chart: daily sum trend (원 단위 그대로, x축 축약)
   const byDate = {};
   for (const t of data) {
     if (!t.date) continue;
@@ -223,9 +243,9 @@ function openDetail(t){
         <div class="text-slate-500 text-sm">Tags</div>
         <div class="font-medium">${t.tags||''}</div>
       </div>
-      <div class="detail-images">
-        ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img">`:''}
-        ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img">`:''}
+      <div class="detail-images" style="display:flex;gap:.75rem;">
+        ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
+        ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
       </div>
     </div>`;
   $('#detailContent').innerHTML = html;
@@ -237,8 +257,12 @@ function openDetail(t){
     if (!el) return;
     el.addEventListener('click', async (ev)=>{
       ev.stopPropagation();
-      if (el.requestFullscreen) el.requestFullscreen();
-      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      if (document.fullscreenElement) {
+        await document.exitFullscreen().catch(()=>{});
+      } else {
+        if (el.requestFullscreen) await el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      }
     });
   }
   setupFS('img1'); setupFS('img2');
@@ -272,7 +296,7 @@ function recomputeCalendarEvents(all) {
   for (const d of dates) {
     const val = sums[d] || 0;
     events.push({
-      title: String(Math.round(val)),
+      title: fmtMan(Math.round(val)), // 만원 단위로 간결 표기
       start: d,
       allDay: true,
       color: val >= 0 ? '#dc2626' : '#2563eb',
@@ -299,7 +323,7 @@ function recomputeCalendarEvents(all) {
       const saturday = new Date(weekStart);
       saturday.setDate(saturday.getDate()+5);
       events.push({
-        title: `주간 ${Math.round(sum)}`,
+        title: fmtMan(Math.round(sum)), // "주간" 제거, 색상만 다르게
         start: saturday.toISOString().slice(0,10),
         allDay: true,
         color: '#111827',
@@ -316,6 +340,11 @@ async function initCalendar() {
     initialView: 'dayGridMonth',
     height: 'auto',
     locale: 'ko',
+    dayCellDidMount: (arg)=>{
+      const d = arg.date.getDay();
+      if (d === 0) { arg.el.style.color = '#dc2626'; }   // Sunday red
+      if (d === 6) { arg.el.style.color = '#2563eb'; }   // Saturday blue
+    },
     dateClick: async (info) => { renderCalendarList(info.dateStr); },
     eventClick: async (info) => {
       const ep = info.event.extendedProps || {};
@@ -339,18 +368,29 @@ async function renderCalendarList(dateStr) {
   const rows = all.filter(t => t.date === dateStr).sort((a,b)=> (a.created_at||'').localeCompare(b.created_at||''));
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
   const out = [`<div class="card"><h3 class="font-semibold">${dateStr} 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,
-               `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap">수익률</th><th class="py-1 pr-3 nowrap">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];
+               `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr>
+                 <th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];
   for (const t of rows) {
     const pnl = formatPnL(t), r = rate(t);
-    out.push(`<tr class="border-t border-slate-100"><td class="py-1 pr-3 nowrap">${t.symbol}</td>
-      <td class="py-1 pr-3 nowrap">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
-      <td class="py-1 pr-3 nowrap">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
+    out.push(`<tr class="border-t border-slate-100">
+      <td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button></td>
+      <td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
+      <td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
       <td class="py-1 pr-3 nowrap">${fmtNumber(t.qty)}</td>
       <td class="py-1 pr-3 nowrap">${fmtPrice(t.buy_price)}</td>
       <td class="py-1 pr-3 nowrap">${fmtPrice(t.sell_price)}</td></tr>`);
   }
   out.push(`</tbody></table></div>`);
-  document.getElementById('calendarList').innerHTML = out.join('');
+  const host = document.getElementById('calendarList');
+  host.innerHTML = out.join('');
+  // 심볼 클릭 → 상세
+  host.querySelectorAll('.link-symbol').forEach(btn=>{
+    btn.addEventListener('click', async (ev)=>{
+      const id = Number(btn.getAttribute('data-id'));
+      const rec = await idbGet(id);
+      if (rec) openDetail(rec);
+    });
+  });
 }
 
 async function renderWeekList(weekStart) {
@@ -363,19 +403,30 @@ async function renderWeekList(weekStart) {
                   .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
   const out = [`<div class="card"><h3 class="font-semibold">${sKey} ~ ${eKey} 주간 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,
-               `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr><th class="py-1 pr-3 nowrap">날짜</th><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap">수익률</th><th class="py-1 pr-3 nowrap">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];
+               `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr>
+                 <th class="py-1 pr-3 nowrap">날짜</th><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];
   for (const t of rows) {
     const pnl = formatPnL(t), r = rate(t);
-    out.push(`<tr class="border-t border-slate-100"><td class="py-1 pr-3 nowrap">${fmtDateNoYear(t.date)}</td>
-      <td class="py-1 pr-3 nowrap">${t.symbol}</td>
-      <td class="py-1 pr-3 nowrap">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
-      <td class="py-1 pr-3 nowrap">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
+    out.push(`<tr class="border-t border-slate-100">
+      <td class="py-1 pr-3 nowrap">${fmtDateNoYear(t.date)}</td>
+      <td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button></td>
+      <td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
+      <td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
       <td class="py-1 pr-3 nowrap">${fmtNumber(t.qty)}</td>
       <td class="py-1 pr-3 nowrap">${fmtPrice(t.buy_price)}</td>
       <td class="py-1 pr-3 nowrap">${fmtPrice(t.sell_price)}</td></tr>`);
   }
   out.push(`</tbody></table></div>`);
-  document.getElementById('calendarList').innerHTML = out.join('');
+  const host = document.getElementById('calendarList');
+  host.innerHTML = out.join('');
+  // 심볼 클릭 → 상세
+  host.querySelectorAll('.link-symbol').forEach(btn=>{
+    btn.addEventListener('click', async (ev)=>{
+      const id = Number(btn.getAttribute('data-id'));
+      const rec = await idbGet(id);
+      if (rec) openDetail(rec);
+    });
+  });
 }
 
 // ---------- Tab logic ----------
@@ -383,7 +434,8 @@ function switchTab(name) {
   $$('.card').forEach(sec=>sec.classList.add('hidden'));
   $('#tab-' + name).classList.remove('hidden');
   $$('.tab-btn').forEach(btn=>btn.classList.remove('tab-active'));
-  document.querySelector(`[data-tab="${name}"]`).classList.add('tab-active');
+  const navBtn = document.querySelector(`[data-tab="${name}"]`);
+  if (navBtn) navBtn.classList.add('tab-active');
   if (name === 'calendar') refreshCalendar();
   if (name === 'list') renderList();
 }
@@ -432,6 +484,18 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   // Tabs
   $$('.tab-btn').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
   switchTab('list');
+
+  // File input: 선택된 파일명을 버튼 텍스트로 표시
+  const form = $('#tradeForm');
+  ['image1','image2'].forEach(name=>{
+    const input = form.querySelector(`input[name="${name}"]`);
+    if (!input) return;
+    const labelSpan = input.closest('label')?.querySelector('span.btn-secondary');
+    input.addEventListener('change', ()=>{
+      const f = input.files && input.files[0];
+      if (labelSpan) labelSpan.textContent = f ? f.name : '파일 선택';
+    });
+  });
 
   // List controls
   $('#searchInput').addEventListener('input', renderList);
