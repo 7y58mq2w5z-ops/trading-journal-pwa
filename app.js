@@ -1,7 +1,8 @@
-/* Trading Journal - v5
- * - Fix: Detail image click now always zooms (Fullscreen API with CSS fallback)
- * - UI: Wider search box, smaller sort/month selects
- * - UI: Month dropdown '전체(모든 월)' → '전체' and narrower width
+/* Trading Journal - v7
+ * - Detail modal: '편집' 버튼 추가 (닫기 아래)
+ * - 편집 클릭 시 입력 탭으로 이동, 폼 자동 채우기
+ * - 이미지 개별 삭제 버튼(이미지1/이미지2) 추가: 선택 시 해당 이미지만 제거 저장
+ * - 유지: 이미지 자동 리사이즈(2000px) + JPEG q=0.85, UI 조정 등
  */
 
 // ---------- Tiny IndexedDB helper ----------
@@ -121,6 +122,53 @@ function toggleZoomFallback(el){
   }
 }
 
+// ---------- Image Compression (HQ: 2000px, q=0.85) ----------
+function readFileAsImage(file){
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{ URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = (e)=>{ URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
+  });
+}
+
+function canvasToDataURL(canvas, mime='image/jpeg', quality=0.85){
+  try { return canvas.toDataURL(mime, quality); }
+  catch { return canvas.toDataURL(); }
+}
+
+async function compressFileToDataURL(file, {maxSide=2000, quality=0.85} = {}){
+  if (!file) return null;
+  // Skip very small files (<200KB) to save time and preserve quality
+  if (file.size && file.size < 200*1024) {
+    return await new Promise((resolve)=>{
+      const r = new FileReader(); r.onload = ()=>resolve(r.result); r.readAsDataURL(file);
+    });
+  }
+  let img;
+  try { img = await readFileAsImage(file); }
+  catch {
+    // fallback: read as-is
+    return await new Promise((resolve)=>{
+      const r = new FileReader(); r.onload = ()=>resolve(r.result); r.readAsDataURL(file);
+    });
+  }
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  const scale = Math.min(1, maxSide / Math.max(w, h));
+  const outW = Math.max(1, Math.round(w * scale));
+  const outH = Math.max(1, Math.round(h * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = outW; canvas.height = outH;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, outW, outH);
+  return canvasToDataURL(canvas, 'image/jpeg', quality);
+}
+
 // ---------- Form helpers ----------
 function clearForm() {
   const form = $('#tradeForm');
@@ -128,10 +176,13 @@ function clearForm() {
   form.id.value = '';
   document.querySelectorAll('input[name="tags[]"]').forEach(ch => ch.checked = false);
   $('#deleteTrade').classList.add('hidden');
+  form.dataset.clearImage1 = '0';
+  form.dataset.clearImage2 = '0';
   form.querySelectorAll('input[type="file"]').forEach((inp)=>{
     const span = inp.closest('label')?.querySelector('span.btn-secondary');
     if (span) span.textContent = '파일 선택';
   });
+  $$('.btn-clear-image').forEach(btn => btn.classList.add('hidden'));
 }
 
 function fillForm(t) {
@@ -149,19 +200,50 @@ function fillForm(t) {
     document.querySelectorAll('input[name="tags[]"]').forEach(ch => { if (set.has(ch.value)) ch.checked = true; });
   }
   $('#deleteTrade').classList.toggle('hidden', !t.id);
+  form.dataset.clearImage1 = '0';
+  form.dataset.clearImage2 = '0';
   [{key:'image1'},{key:'image2'}].forEach(({key})=>{
     const input = form.querySelector(`input[name="${key}"]`);
     const span = input?.closest('label')?.querySelector('span.btn-secondary');
     if (span) span.textContent = t[key] ? '이미지 저장됨' : '파일 선택';
+    const clearBtn = input?.closest('label')?.querySelector('.btn-clear-image');
+    if (clearBtn) clearBtn.classList.toggle('hidden', !t[key]);
   });
 }
 
-function fileToDataURL(file) { return new Promise((resolve) => {
-  if (!file) return resolve(null);
-  const reader = new FileReader();
-  reader.onload = () => resolve(reader.result);
-  reader.readAsDataURL(file);
-});}
+// 이미지 삭제 버튼/동작 주입
+function setupImageClearButtons() {
+  const form = $('#tradeForm');
+  ['image1','image2'].forEach(name=>{
+    const input = form.querySelector(`input[name="${name}"]`);
+    if (!input) return;
+    let clearBtn = input.closest('label')?.querySelector('.btn-clear-image');
+    if (!clearBtn) {
+      clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'btn-secondary btn-clear-image hidden';
+      clearBtn.textContent = '이미지 삭제';
+      input.closest('label')?.appendChild(clearBtn);
+      clearBtn.addEventListener('click', ()=>{
+        // 표시만 ‘삭제됨’으로 바꾸고, 제출 시 실제 null 저장
+        const span = input.closest('label')?.querySelector('span.btn-secondary');
+        if (span) span.textContent = '삭제됨';
+        input.value = ''; // 새 파일 선택 비움
+        form.dataset[name === 'image1' ? 'clearImage1' : 'clearImage2'] = '1';
+        clearBtn.classList.remove('hidden');
+      });
+    }
+    // 파일 새로 선택하면 삭제 플래그 해제 + 버튼 숨김
+    input.addEventListener('change', ()=>{
+      form.dataset[name === 'image1' ? 'clearImage1' : 'clearImage2'] = '0';
+      const span = input.closest('label')?.querySelector('span.btn-secondary');
+      const f = input.files && input.files[0];
+      if (span) span.textContent = f ? f.name : '파일 선택';
+      const btn = input.closest('label')?.querySelector('.btn-clear-image');
+      if (btn) btn.classList.toggle('hidden', !(f));
+    });
+  });
+}
 
 // ---------- Month dropdown ----------
 async function populateMonthSelect() {
@@ -195,7 +277,6 @@ async function populateMonthSelect() {
 
   if ([...monthSel.options].some(o=>o.value===cur)) monthSel.value = cur;
 
-  // widen search, shrink sort/month
   const search = $('#searchInput');
   const sort = $('#sortSelect');
   if (search) search.style.flex = '1 1 auto';
@@ -307,6 +388,10 @@ function openDetail(t){
         ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
         ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
       </div>
+      <div class="mt-4 flex gap-2 justify-end">
+        <button id="detailEdit" class="btn-primary">편집</button>
+        <button id="detailClose" class="btn-secondary">닫기</button>
+      </div>
     </div>`;
   $('#detailContent').innerHTML = html;
   $('#detailModal').classList.add('show');
@@ -323,7 +408,19 @@ function openDetail(t){
   }
   attachZoomHandler('img1'); attachZoomHandler('img2');
 
-  // ESC로 CSS zoom 해제
+  // 편집 버튼 → 입력 탭으로 이동 + 폼 채우기
+  const editBtn = document.getElementById('detailEdit');
+  if (editBtn) {
+    editBtn.addEventListener('click', ()=>{
+      closeDetail();
+      // 입력 탭 이름이 'input' 이라고 가정. 없으면 스크롤만 처리.
+      try { switchTab('input'); } catch {}
+      fillForm(t);
+      const form = document.getElementById('tradeForm');
+      if (form) form.scrollIntoView({behavior:'smooth', block:'start'});
+    });
+  }
+
   document.addEventListener('keydown', (e)=>{
     if (e.key === 'Escape') {
       document.querySelectorAll('.img-zoomed').forEach(x=>x.classList.remove('img-zoomed'));
@@ -477,7 +574,8 @@ async function renderWeekList(weekStart) {
 // ---------- Tab logic ----------
 function switchTab(name) {
   $$('.card').forEach(sec=>sec.classList.add('hidden'));
-  $('#tab-' + name).classList.remove('hidden');
+  const tab = document.getElementById('tab-' + name);
+  if (tab) tab.classList.remove('hidden');
   $$('.tab-btn').forEach(btn=>btn.classList.remove('tab-active'));
   const navBtn = document.querySelector(`[data-tab="${name}"]`);
   if (navBtn) navBtn.classList.add('tab-active');
@@ -528,10 +626,15 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   await openDB();
 
   $$('.tab-btn').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
+  // 초깃값: 리스트 탭
   switchTab('list');
 
   await populateMonthSelect();
 
+  // 이미지 삭제 버튼/행동 주입
+  setupImageClearButtons();
+
+  // 파일 선택 시 버튼 라벨 갱신
   const form = $('#tradeForm');
   ['image1','image2'].forEach(name=>{
     const input = form.querySelector(`input[name="${name}"]`);
@@ -543,6 +646,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     });
   });
 
+  // List controls
   $('#searchInput').addEventListener('input', renderList);
   $('#sortSelect').addEventListener('change', renderList);
   $('#exportBtn').addEventListener('click', exportJSON);
@@ -550,17 +654,23 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     if (e.target.files && e.target.files[0]) importJSON(e.target.files[0]);
   });
 
+  // Form submit with compression (HQ profile: 2000px, q=0.85)
   $('#tradeForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
     const f = e.target;
+
     let prev = null;
     const editId = f.id.value ? Number(f.id.value) : null;
     if (editId) prev = await idbGet(editId);
 
-    const newImg1 = await fileToDataURL(f.image1.files[0]);
-    const newImg2 = await fileToDataURL(f.image2.files[0]);
-    const img1 = newImg1 || (prev ? prev.image1 : null);
-    const img2 = newImg2 || (prev ? prev.image2 : null);
+    const clear1 = f.dataset.clearImage1 === '1';
+    const clear2 = f.dataset.clearImage2 === '1';
+
+    const newImg1 = await compressFileToDataURL(f.image1.files[0], {maxSide:2000, quality:0.85});
+    const newImg2 = await compressFileToDataURL(f.image2.files[0], {maxSide:2000, quality:0.85});
+
+    const img1 = newImg1 ?? (clear1 ? null : (prev ? prev.image1 : null));
+    const img2 = newImg2 ?? (clear2 ? null : (prev ? prev.image2 : null));
 
     const tags = Array.from(document.querySelectorAll('input[name="tags[]"]:checked')).map(x=>x.value).join(',');
 
@@ -579,6 +689,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     };
     if (payload.id) { await idbPut(payload); alert('수정 완료'); }
     else { await idbAdd(payload); alert('저장 완료'); }
+
     clearForm();
     await populateMonthSelect();
     await renderList();
