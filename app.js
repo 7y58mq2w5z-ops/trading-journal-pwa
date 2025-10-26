@@ -1,9 +1,8 @@
-/* Trading Journal - v8
- * - 상세보기: 기존 닫기 버튼 아래에 '편집' 버튼만 추가 (하단 새 닫기 버튼 제거)
- * - 편집 클릭 시 즉시 입력 탭을 보여주고 폼을 자동 채움 (빈 화면 방지)
- * - 이미지 관리 UX 변경: '이미지 저장됨' 라벨 클릭 시 '삭제/변경' 동작 선택
- *   (확인=삭제, 취소=변경 → 파일 선택창)
- * - 유지: 이미지 자동 리사이즈(2000px, q=0.85), 검색/정렬/월 UI 조정 등
+/* Trading Journal - v9
+ * - 상세보기 버튼 복구: '닫기' 버튼을 명시적으로 렌더링 + 그 바로 아래 '편집' 버튼을 함께 렌더
+ * - 편집 클릭 시 입력 탭 즉시 표시 + 폼 자동 채움 (빈 화면 문제 해결)
+ * - 리스트의 '간단 분석'(차트) 제거: 차트 렌더링 코드 삭제 + 분석 카드가 있으면 숨김
+ * - 유지: 이미지 관리 UX(라벨 클릭 → 삭제/변경), 자동 리사이즈(2000px,q=0.85), 기타 UI
  */
 
 // ---------- Tiny IndexedDB helper ----------
@@ -207,7 +206,7 @@ function fillForm(t) {
   });
 }
 
-// '이미지 저장됨' 클릭 → 삭제/변경 선택
+// '이미지 저장됨'(라벨) 클릭 → 삭제/변경 선택
 function setupImageManage() {
   const form = $('#tradeForm');
   ['image1','image2'].forEach(name=>{
@@ -218,24 +217,20 @@ function setupImageManage() {
     span.style.cursor = 'pointer';
     span.addEventListener('click', ()=>{
       const txt = span.textContent || '';
-      if (txt.includes('이미지 저장됨') || txt !== '파일 선택') {
-        const del = confirm('이미지를 삭제할까요?\\n확인 = 삭제, 취소 = 이미지 변경');
+      if (txt.includes('이미지 저장됨') || (txt && txt !== '파일 선택' && txt !== '삭제됨')) {
+        const del = confirm('이미지를 삭제할까요?\n확인 = 삭제, 취소 = 이미지 변경');
         if (del) {
-          // 삭제
           span.textContent = '삭제됨';
           input.value = '';
           form.dataset[name === 'image1' ? 'clearImage1' : 'clearImage2'] = '1';
         } else {
-          // 변경: 파일 선택창 열기
           form.dataset[name === 'image1' ? 'clearImage1' : 'clearImage2'] = '0';
           input.click();
         }
       } else {
-        // 아직 파일 없음 → 파일 선택
         input.click();
       }
     });
-    // 실제 파일 선택 시 라벨 갱신
     input.addEventListener('change', ()=>{
       const f = input.files && input.files[0];
       span.textContent = f ? f.name : '파일 선택';
@@ -283,8 +278,11 @@ async function populateMonthSelect() {
 }
 
 // ---------- List render ----------
-let chart;
 async function renderList() {
+  // 만약 index.html에 '간단 분석' 카드가 존재하면 숨김
+  const analysisCard = document.getElementById('analysisCard');
+  if (analysisCard) analysisCard.style.display = 'none';
+
   const q = $('#searchInput').value.trim().toLowerCase();
   const sortKey = $('#sortSelect').value;
   const monthKey = $('#monthSelect') ? $('#monthSelect').value : 'all';
@@ -335,21 +333,6 @@ async function renderList() {
       if (rec) openDetail(rec);
     });
   });
-
-  // Chart (overall data)
-  const byDate = {};
-  for (const t of data) if (t.date) byDate[t.date] = (byDate[t.date] || 0) + formatPnL(t);
-  const days = Object.keys(byDate).sort();
-  const labels = days.map(fmtDateNoYear);
-  const values = days.map(d => byDate[d]);
-
-  if (chart) chart.destroy();
-  const ctx = document.getElementById('pnlChart');
-  chart = new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets: [{ label: '일별 손익 합계', data: values }] },
-    options: { responsive: true, maintainAspectRatio: false }
-  });
 }
 
 // ---------- Detail Modal ----------
@@ -387,6 +370,10 @@ function openDetail(t){
         ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
         ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
       </div>
+      <div class="mt-4 flex flex-col items-end gap-2">
+        <button id="detailClose" class="btn-secondary">닫기</button>
+        <button id="detailEdit" class="btn-primary">편집</button>
+      </div>
     </div>`;
   $('#detailContent').innerHTML = html;
   $('#detailModal').classList.add('show');
@@ -404,28 +391,20 @@ function openDetail(t){
   }
   attachZoomHandler('img1'); attachZoomHandler('img2');
 
-  // 기존 닫기 버튼 아래에 '편집' 삽입 (중복 방지 후 재삽입)
-  const oldEdit = document.getElementById('detailEdit');
-  if (oldEdit) oldEdit.remove();
+  // 이벤트 바인딩
   const closeBtn = document.getElementById('detailClose');
-  if (closeBtn) {
-    const editBtn = document.createElement('button');
-    editBtn.id = 'detailEdit';
-    editBtn.className = 'btn-primary mt-2';
-    editBtn.textContent = '편집';
-    closeBtn.insertAdjacentElement('afterend', editBtn);
-    editBtn.addEventListener('click', ()=>{
-      closeDetail();
-      // 입력 탭 바로 표시 + 폼 채우기
-      const container = document.getElementById('tab-input');
-      if (container) container.classList.remove('hidden');
-      // 탭 스위치(가능한 경우)
-      try { switchTab('input'); } catch {}
-      fillForm(t);
-      const form = document.getElementById('tradeForm');
-      if (form) { form.scrollIntoView({behavior:'smooth', block:'start'}); form.querySelector('input[name="date"]')?.focus(); }
-    });
-  }
+  if (closeBtn) closeBtn.addEventListener('click', closeDetail);
+
+  const editBtn = document.getElementById('detailEdit');
+  if (editBtn) editBtn.addEventListener('click', ()=>{
+    closeDetail();
+    const container = document.getElementById('tab-input');
+    if (container) container.classList.remove('hidden');
+    try { switchTab('input'); } catch {}
+    fillForm(t);
+    const form = document.getElementById('tradeForm');
+    if (form) { form.scrollIntoView({behavior:'smooth', block:'start'}); form.querySelector('input[name="date"]')?.focus(); }
+  });
 
   // ESC: 폴백 확대 해제
   document.addEventListener('keydown', (e)=>{
@@ -434,7 +413,6 @@ function openDetail(t){
 }
 
 function closeDetail(){ $('#detailModal').classList.remove('show'); }
-document.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'detailClose') closeDetail(); });
 document.getElementById('detailModal').addEventListener('click', (e)=>{ if (e.target.id === 'detailModal') closeDetail(); });
 
 // ---------- Calendar ----------
@@ -578,7 +556,6 @@ async function renderWeekList(weekStart) {
 
 // ---------- Tab logic ----------
 function switchTab(name) {
-  // 탭 컨텐트는 #tab-* 로 가정
   const tabs = Array.from(document.querySelectorAll('[id^="tab-"]'));
   tabs.forEach(sec=>sec.classList.add('hidden'));
   const tab = document.getElementById('tab-' + name);
@@ -635,15 +612,16 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   await openDB();
 
   $$('.tab-btn').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
-  // 초깃값: 리스트 탭
   switchTab('list');
 
   await populateMonthSelect();
-
-  // 이미지 라벨 클릭 관리
   setupImageManage();
 
-  // 파일 선택 시 버튼 라벨 갱신(중복 안전)
+  // 혹시 '간단 분석' 카드가 레이아웃에 있으면 숨겨두기
+  const analysisCard = document.getElementById('analysisCard');
+  if (analysisCard) analysisCard.style.display = 'none';
+
+  // 입력 폼 파일 라벨 갱신
   const form = $('#tradeForm');
   ['image1','image2'].forEach(name=>{
     const input = form.querySelector(`input[name="${name}"]`);
