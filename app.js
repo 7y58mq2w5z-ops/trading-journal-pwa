@@ -243,26 +243,6 @@ function openDetail(t){
   }
   setupFS('img1'); setupFS('img2');
 }
-        ${t.image2?`<img id="img2" src="${t.image2}" class="rounded-xl shadow max-h-[60vh] w-full object-contain cursor-zoom-in">`:''}
-      </div>
-    </div>
-  `;
-  $('#detailContent').innerHTML = html;
-  $('#detailModal').classList.remove('hidden');
-  $('#detailModal').classList.add('flex');
-
-  function setupFS(id){
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('click', async ()=>{
-      if (el.requestFullscreen) el.requestFullscreen();
-      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-      // close fullscreen by back button or ESC (default browser behavior)
-    });
-  }
-  setupFS('img1'); setupFS('img2');
-}
-
 
 function closeDetail(){
   const modal = $('#detailModal');
@@ -520,5 +500,6 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   // Calendar
   await initCalendar();
 })();
+
 // flag to confirm JS loaded
 window.__APP_OK__ = true;
