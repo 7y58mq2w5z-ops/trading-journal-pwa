@@ -29,7 +29,12 @@
     .input { border:1px solid #e5e7eb; border-radius:.5rem; padding:.5rem .75rem; }
     .btn-secondary { border:1px solid #e5e7eb; border-radius:.5rem; padding:.5rem .75rem; background:#f8fafc; }
     .btn-save { background:#10b981; color:#fff; border-radius:.5rem; padding:.5rem .75rem; }
-    .btn-new { background:#e5e7eb; border-radius:.5rem; padding:.5rem .75rem; }
+    .btn-new, #cancelBtn {
+  background: #374151 !important; /* slate-700 */
+  color: #fff !important;
+  border-radius: .5rem;
+  padding: .5rem .75rem;
+}
     .btn-danger { background:#ef4444; color:#fff; border-radius:.5rem; padding:.5rem .75rem; }
     .pnl-pos { color:#dc2626; font-weight:600; }
     .pnl-neg { color:#2563eb; font-weight:600; }
@@ -92,8 +97,8 @@
         </div>
 
         <div class="flex gap-2 mt-2">
-          <button class="btn-save" type="submit">저장</button>
-          <button class="btn-new" type="button" id="resetForm">새로 입력</button>
+          <button class="btn-save" type="submit" id="saveBtn">저장</button>
+          <button class="btn-new" type="button" id="cancelBtn">새로 입력</button>
           <button class="btn-danger hidden" type="button" id="deleteTrade">삭제</button>
         </div>
       </form>
