@@ -1,8 +1,10 @@
-/* Trading Journal - v9
- * - 상세보기 버튼 복구: '닫기' 버튼을 명시적으로 렌더링 + 그 바로 아래 '편집' 버튼을 함께 렌더
- * - 편집 클릭 시 입력 탭 즉시 표시 + 폼 자동 채움 (빈 화면 문제 해결)
- * - 리스트의 '간단 분석'(차트) 제거: 차트 렌더링 코드 삭제 + 분석 카드가 있으면 숨김
- * - 유지: 이미지 관리 UX(라벨 클릭 → 삭제/변경), 자동 리사이즈(2000px,q=0.85), 기타 UI
+/* Trading Journal - v10 (safe apply)
+ * - Robust detail buttons: always render '닫기' + (just below) '편집' INSIDE modal content
+ *   and bind by id + fallback by button text (한글) so it works even if classes/ids differ.
+ * - '편집' opens input form immediately (no blank view). Falls back to unhide #tab-input.
+ * - Image manage: click '이미지 저장됨'(또는 파일명 라벨) → Confirm(삭제)/Cancel(변경).
+ * - '간단 분석' 완전 제거: 차트 코드 삭제 + 화면에 보이면 텍스트/아이디/클래스 기반으로 모두 숨김.
+ * - Adds runtime version: window.__APP_VERSION__ = 'v10' (DevTools에서 확인 가능)
  */
 
 // ---------- Tiny IndexedDB helper ----------
@@ -279,9 +281,15 @@ async function populateMonthSelect() {
 
 // ---------- List render ----------
 async function renderList() {
-  // 만약 index.html에 '간단 분석' 카드가 존재하면 숨김
-  const analysisCard = document.getElementById('analysisCard');
-  if (analysisCard) analysisCard.style.display = 'none';
+  // '간단 분석' 관련 요소 보이면 숨김(방어적으로 다양하게)
+  const kill = (el)=>{ if(!el) return; el.style.display='none'; el.innerHTML=''; };
+  kill(document.getElementById('analysisCard'));
+  document.querySelectorAll('.analysis,.simple-analysis,[data-analysis],canvas#pnlChart').forEach(kill);
+  // 텍스트 포함 카드(한국어)도 방어적으로 숨김
+  document.querySelectorAll('.card,div,section').forEach(el=>{
+    const t = (el.textContent||'').trim();
+    if (t && t.includes('간단 분석')) kill(el);
+  });
 
   const q = $('#searchInput').value.trim().toLowerCase();
   const sortKey = $('#sortSelect').value;
@@ -340,6 +348,7 @@ function openDetail(t){
   const pnl = formatPnL(t);
   const r = rate(t);
   const buyAmount = (Number(t.buy_price||0) * Number(t.qty||0));
+
   const html = `
     <div class="detail-grid">
       <div>
@@ -370,12 +379,15 @@ function openDetail(t){
         ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
         ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
       </div>
+
       <div class="mt-4 flex flex-col items-end gap-2">
         <button id="detailClose" class="btn-secondary">닫기</button>
         <button id="detailEdit" class="btn-primary">편집</button>
       </div>
     </div>`;
-  $('#detailContent').innerHTML = html;
+
+  const host = $('#detailContent');
+  host.innerHTML = html;
   $('#detailModal').classList.add('show');
 
   // 확대
@@ -391,16 +403,18 @@ function openDetail(t){
   }
   attachZoomHandler('img1'); attachZoomHandler('img2');
 
-  // 이벤트 바인딩
-  const closeBtn = document.getElementById('detailClose');
+  // --- Bind buttons (robust) ---
+  const closeBtn = document.getElementById('detailClose') || Array.from(host.querySelectorAll('button')).find(b=>b.textContent?.trim()==='닫기');
   if (closeBtn) closeBtn.addEventListener('click', closeDetail);
 
-  const editBtn = document.getElementById('detailEdit');
+  const editBtn = document.getElementById('detailEdit') || Array.from(host.querySelectorAll('button')).find(b=>b.textContent?.trim()==='편집');
   if (editBtn) editBtn.addEventListener('click', ()=>{
     closeDetail();
+    // show input tab immediately
+    const tabBtn = document.querySelector('.tab-btn[data-tab="input"]');
+    if (tabBtn) tabBtn.click();
     const container = document.getElementById('tab-input');
     if (container) container.classList.remove('hidden');
-    try { switchTab('input'); } catch {}
     fillForm(t);
     const form = document.getElementById('tradeForm');
     if (form) { form.scrollIntoView({behavior:'smooth', block:'start'}); form.querySelector('input[name="date"]')?.focus(); }
@@ -617,22 +631,6 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   await populateMonthSelect();
   setupImageManage();
 
-  // 혹시 '간단 분석' 카드가 레이아웃에 있으면 숨겨두기
-  const analysisCard = document.getElementById('analysisCard');
-  if (analysisCard) analysisCard.style.display = 'none';
-
-  // 입력 폼 파일 라벨 갱신
-  const form = $('#tradeForm');
-  ['image1','image2'].forEach(name=>{
-    const input = form.querySelector(`input[name="${name}"]`);
-    if (!input) return;
-    const span = input.closest('label')?.querySelector('span.btn-secondary');
-    input.addEventListener('change', ()=>{
-      const f = input.files && input.files[0];
-      if (span) span.textContent = f ? f.name : '파일 선택';
-    });
-  });
-
   // List controls
   $('#searchInput').addEventListener('input', renderList);
   $('#sortSelect').addEventListener('change', renderList);
@@ -700,5 +698,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   await initCalendar();
 })();
 
-// flag to confirm JS loaded
+// flags
 window.__APP_OK__ = true;
+window.__APP_VERSION__ = 'v10';
+console.log('Trading Journal JS loaded:', window.__APP_VERSION__);
