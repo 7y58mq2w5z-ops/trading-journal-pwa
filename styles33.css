@@ -1,0 +1,44 @@
+
+/* Basic layout */
+:root {
+  --bg: #f8fafc; /* slate-50 */
+  --text: #0f172a; /* slate-900 */
+  --card-bg: #ffffff;
+  --shadow: 0 10px 20px rgba(0,0,0,0.05);
+  --radius: 1rem;
+}
+body { background: var(--bg); color: var(--text); }
+.card { background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow); padding: 1rem; }
+.input { border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 0.5rem; width: 100%; background: #fff; }
+.label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.9rem; }
+.nowrap { white-space: nowrap; }
+
+/* Buttons */
+.btn-secondary { padding: 0.5rem 0.75rem; border-radius: 0.75rem; background: #e5e7eb; }
+.btn-danger { padding: 0.5rem 0.75rem; border-radius: 0.75rem; background: #dc2626; color: #fff; }
+.btn-save { padding: 0.5rem 0.75rem; border-radius: 0.75rem; background: #059669; color: #fff; } /* emerald-600 */
+.btn-save:hover { background: #047857; }
+.btn-new { padding: 0.5rem 0.75rem; border-radius: 0.75rem; background: #f59e0b; color: #fff; } /* amber-500 */
+.btn-new:hover { background: #d97706; }
+
+/* Tabs */
+.tab-btn { padding: 0.5rem 0.75rem; border-radius: 0.75rem; text-align:center; font-weight: 600; }
+.tab-form { background: #e0f2fe; }     /* sky-100 */
+.tab-list { background: #d1fae5; }     /* emerald-100 */
+.tab-calendar { background: #e0e7ff; } /* indigo-100 */
+.tab-active { outline: 2px solid #0f172a; outline-offset: 2px; }
+
+/* PnL colors */
+.pnl-pos { color: #dc2626; font-weight: 600; } /* red-600 */
+.pnl-neg { color: #2563eb; font-weight: 600; } /* blue-600 */
+
+/* Modal */
+.modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; padding: 1rem; z-index: 50; }
+.modal-mask.show { display: flex; }
+.modal-card { background: #fff; border-radius: 1rem; box-shadow: var(--shadow); width: 100%; max-width: 64rem; max-height: 90vh; overflow: auto; position: relative; }
+.modal-close { position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.4rem 0.75rem; border-radius: 0.5rem; background: #e5e7eb; }
+.detail-grid { display: grid; grid-template-columns: 1fr; gap: 0.75rem; padding: 1rem; }
+@media (min-width: 768px) { .detail-grid { grid-template-columns: 1fr 1fr; } }
+.detail-images { display: grid; grid-template-columns: 1fr; gap: 0.5rem; }
+@media (min-width: 768px) { .detail-images { grid-template-columns: 1fr 1fr; } }
+.detail-img { border-radius: 0.75rem; box-shadow: var(--shadow); max-height: 60vh; width: 100%; object-fit: contain; cursor: zoom-in; }

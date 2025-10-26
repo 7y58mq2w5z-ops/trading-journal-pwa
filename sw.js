@@ -1,11 +1,11 @@
 // Service Worker for offline cache
-const CACHE_NAME = 'journal-cache-v32';
+const CACHE_NAME = 'journal-cache-v33';
 const ASSETS = [
   './',
   './index.html',
-  './styles31.css',
-  './app31.js',
-  './manifest31.json',
+  './styles33.css',
+  './app33.js',
+  './manifest33.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
   'https://cdn.tailwindcss.com',
