@@ -1,25 +1,14 @@
-/* Trading Journal - v12 (null-safe + self-healing UI)
- * 콘솔 오류 원인 해결:
- *  - renderList에서 #searchInput / #sortSelect 가 없을 때 null.value 접근 에러 → 전부 null-safe
- *  - setupImageManage에서 label>span.btn-secondary 없을 때 querySelector 에러 →
- *    없으면 자동으로 대체 버튼을 생성하여(파일 입력 바로 뒤) 동일 동작 제공
- *  - 초기화 순서 보강 및 풍부한 로그
- * 추가:
- *  - '간단 분석' 완전 제거/숨김
- *  - 상세 모달: '닫기' 아래 '편집' 강제 표시 + 편집 클릭 시 입력 폼 즉시 표시/자동채움
- *  - 캘린더 라이브러리 미로딩 시 우아한 비활성화
+/* Trading Journal - v13 (self-healing containers + tab alias)
+ * - #listContainer / #calendar / #calendarList 가 없어도 자동 생성
+ * - 탭 이름 'form'/'input' 혼용 지원: data-tab="form" 또는 "input" 모두 처리
+ * - 상세보기 편집 → 즉시 폼 탭으로 이동 (form 우선, 없으면 input)
+ * - '간단 분석' 완전 제거
+ * - FullCalendar 미로딩 시 우아한 비활성화
+ * - 풍부한 콘솔 로그로 상태 확인
  */
 
-// -------------------- Global guards --------------------
-window.__APP_VERSION__ = 'v12';
+window.__APP_VERSION__ = 'v13';
 console.log('[Journal] boot', window.__APP_VERSION__);
-
-window.addEventListener('error', (e)=>{
-  console.error('[Journal] Uncaught error:', e?.error || e?.message || e);
-});
-window.addEventListener('unhandledrejection', (e)=>{
-  console.error('[Journal] Unhandled promise rejection:', e?.reason || e);
-});
 
 // -------------------- IndexedDB helpers --------------------
 const DB_NAME = 'journal-db';
@@ -57,25 +46,21 @@ function idbGet(id){ return idbWrap(()=> new Promise((resolve,reject)=>{
   req.onsuccess = ()=> resolve(req.result);
   req.onerror = ()=> reject(req.error);
 }), null);}
-
 function idbAdd(trade){ return idbWrap(()=> new Promise((resolve,reject)=>{
   const tx = db.transaction(STORE_NAME, 'readwrite');
   tx.objectStore(STORE_NAME).add(trade).onsuccess = (e)=> resolve(e.target.result);
   tx.onerror = ()=> reject(tx.error);
 }), null);}
-
 function idbPut(trade){ return idbWrap(()=> new Promise((resolve,reject)=>{
   const tx = db.transaction(STORE_NAME, 'readwrite');
   tx.objectStore(STORE_NAME).put(trade).onsuccess = ()=> resolve();
   tx.onerror = ()=> reject(tx.error);
 }), null);}
-
 function idbDelete(id){ return idbWrap(()=> new Promise((resolve,reject)=>{
   const tx = db.transaction(STORE_NAME, 'readwrite');
   tx.objectStore(STORE_NAME).delete(id).onsuccess = ()=> resolve();
   tx.onerror = ()=> reject(tx.error);
 }), null);}
-
 function idbAll(){ return idbWrap(()=> new Promise((resolve,reject)=>{
   const tx = db.transaction(STORE_NAME, 'readonly');
   const req = tx.objectStore(STORE_NAME).getAll();
@@ -87,9 +72,67 @@ function idbAll(){ return idbWrap(()=> new Promise((resolve,reject)=>{
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-function safeEl(id){ const el = document.getElementById(id); if(!el) console.warn('[Journal] missing #' + id); return el; }
+function ensureContainers(){
+  // List
+  if (!$('#listContainer')) {
+    const listTab = $('#tab-list') || document.querySelector('[id^="tab-"].tab-list') || $('#tab-form')?.parentElement || $('#app') || document.body;
+    const div = document.createElement('div');
+    div.id = 'listContainer';
+    div.className = 'overflow-x-auto';
+    (listTab || document.body).appendChild(div);
+    console.log('[Journal] created #listContainer');
+  }
+  // Calendar
+  const calTab = $('#tab-calendar') || $('#app') || document.body;
+  if (!$('#calendar')) {
+    const div = document.createElement('div');
+    div.id = 'calendar';
+    calTab.appendChild(div);
+    console.log('[Journal] created #calendar');
+  }
+  if (!$('#calendarList')) {
+    const div = document.createElement('div');
+    div.id = 'calendarList';
+    div.className = 'mt-4';
+    calTab.appendChild(div);
+    console.log('[Journal] created #calendarList');
+  }
+}
 
-// -------------------- Format helpers --------------------
+function killAnalysis(){
+  const kill = (el)=>{ if(!el) return; el.style.display='none'; el.innerHTML=''; };
+  kill(document.getElementById('analysisCard'));
+  document.querySelectorAll('#pnlChart,.analysis,.simple-analysis,[data-analysis]').forEach(kill);
+  document.querySelectorAll('.card,div,section').forEach(el=>{
+    const t = (el.textContent||'').trim();
+    if (t && t.includes('간단 분석')) kill(el);
+  });
+}
+
+function tabNameForm(){ return $('.tab-btn[data-tab="form"]') ? 'form' : ($('.tab-btn[data-tab="input"]') ? 'input' : 'form'); }
+function clickFormTab(){
+  const name = tabNameForm();
+  const btn = document.querySelector(`.tab-btn[data-tab="${name}"]`);
+  btn?.click();
+  const sec = document.getElementById(`tab-${name}`);
+  if (sec) sec.classList.remove('hidden');
+}
+
+function switchTab(name) {
+  const tabs = Array.from(document.querySelectorAll('[id^="tab-"]'));
+  tabs.forEach(sec=>sec.classList.add('hidden'));
+  const tab = document.getElementById('tab-' + name);
+  if (tab) tab.classList.remove('hidden');
+
+  $$('.tab-btn').forEach(btn=>btn.classList.remove('tab-active'));
+  const navBtn = document.querySelector(`[data-tab="${name}"]`);
+  if (navBtn) navBtn.classList.add('tab-active');
+
+  if (name === 'calendar') refreshCalendar();
+  if (name === 'list') renderList();
+}
+
+// -------------------- Formatting --------------------
 function formatPnL(t) { return (Number(t.sell_price||0) - Number(t.buy_price||0)) * Number(t.qty||0); }
 function rate(t) { if (!t.buy_price) return 0; return ((Number(t.sell_price||0) / Number(t.buy_price||0)) - 1) * 100; }
 function fmtDateNoYear(s){ if(!s) return ''; return s.slice(5); }
@@ -99,187 +142,16 @@ function fmtPrice(n){
   const hasFraction = Math.abs(v - Math.trunc(v)) > 1e-6;
   return hasFraction ? v.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2}) : v.toLocaleString('ko-KR');
 }
-function fmtMan(n){
-  const sign = n < 0 ? -1 : 1;
-  const v = Math.floor(Math.abs(n)/1000)/10;
-  if (v === 0) return '0';
-  return (sign<0?'-':'') + (v%1===0 ? v.toFixed(0) : v.toFixed(1)) + '만';
-}
-function monthKeyOf(dateStr){ if (!dateStr || dateStr.length < 7) return ''; return dateStr.slice(0,7); }
-function monthLabel(key){ if (!key) return '전체'; const [y,m]=key.split('-'); return `${y}년 ${Number(m)}월`; }
-
-// -------------------- Image helpers --------------------
-function ensureZoomStyles(){
-  if (document.getElementById('zoom-style')) return;
-  const s = document.createElement('style'); s.id='zoom-style';
-  s.textContent = `.img-zoomed{position:fixed!important;inset:0!important;background:rgba(0,0,0,.85)!important;object-fit:contain!important;width:100vw!important;height:100vh!important;z-index:9999!important;cursor:zoom-out!important}`;
-  document.head.appendChild(s);
-}
-async function tryFullscreen(el){
-  try{
-    if (document.fullscreenElement === el || document.webkitFullscreenElement === el) {
-      if (document.exitFullscreen) await document.exitFullscreen();
-      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-      return true;
-    } else {
-      if (el.requestFullscreen) { await el.requestFullscreen(); return true; }
-      else if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); return true; }
-    }
-  }catch(e){ /* ignore */ }
-  return false;
-}
-function toggleZoomFallback(el){
-  ensureZoomStyles();
-  el.classList.toggle('img-zoomed');
-}
-function readFileAsImage(file){
-  return new Promise((resolve, reject)=>{
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = ()=>{ URL.revokeObjectURL(url); resolve(img); };
-    img.onerror = (e)=>{ URL.revokeObjectURL(url); reject(e); };
-    img.src = url;
-  });
-}
-function canvasToDataURL(canvas, mime='image/jpeg', quality=0.85){
-  try { return canvas.toDataURL(mime, quality); }
-  catch { return canvas.toDataURL(); }
-}
-async function compressFileToDataURL(file, {maxSide=2000, quality=0.85} = {}){
-  if (!file) return null;
-  if (file.size && file.size < 200*1024) {
-    return await new Promise((resolve)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.readAsDataURL(file); });
-  }
-  let img;
-  try { img = await readFileAsImage(file); }
-  catch { return await new Promise((resolve)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.readAsDataURL(file); }); }
-  const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
-  const scale = Math.min(1, maxSide/Math.max(w,h));
-  const outW = Math.max(1, Math.round(w*scale)), outH = Math.max(1, Math.round(h*scale));
-  const c = document.createElement('canvas'); c.width=outW; c.height=outH;
-  const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, 0, 0, outW, outH);
-  return canvasToDataURL(c, 'image/jpeg', quality);
-}
-
-// -------------------- Form --------------------
-function clearForm() {
-  const form = $('#tradeForm'); if (!form) return;
-  form.reset();
-  if (form.id) form.id.value = '';
-  document.querySelectorAll('input[name="tags[]"]').forEach(ch => ch.checked = false);
-  $('#deleteTrade')?.classList.add('hidden');
-  form.dataset.clearImage1 = '0'; form.dataset.clearImage2 = '0';
-  form.querySelectorAll('input[type="file"]').forEach((inp)=>{
-    // 라벨이 없을 수도 있으므로 아무 것도 안 함
-    const span = inp.closest('label')?.querySelector('span.btn-secondary');
-    if (span) span.textContent = '파일 선택';
-    const proxy = inp.nextElementSibling;
-    if (proxy && proxy.classList?.contains('img-proxy')) proxy.textContent = '파일 선택';
-  });
-}
-function fillForm(t) {
-  const form = $('#tradeForm'); if (!form) return;
-  if (form.id) form.id.value = t.id || '';
-  if (form.date) form.date.value = t.date || '';
-  if (form.symbol) form.symbol.value = t.symbol || '';
-  if (form.qty) form.qty.value = t.qty ?? '';
-  if (form.buy_price) form.buy_price.value = t.buy_price ?? '';
-  if (form.sell_price) form.sell_price.value = t.sell_price ?? '';
-  if (form.comment) form.comment.value = t.comment || '';
-  document.querySelectorAll('input[name="tags[]"]').forEach(ch => { ch.checked = false; });
-  if (t.tags) {
-    const set = new Set(String(t.tags).split(',').map(s=>s.trim()).filter(Boolean));
-    document.querySelectorAll('input[name="tags[]"]').forEach(ch => { if (set.has(ch.value)) ch.checked = true; });
-  }
-  $('#deleteTrade')?.classList.toggle('hidden', !t.id);
-  form.dataset.clearImage1 = '0'; form.dataset.clearImage2 = '0';
-  ['image1','image2'].forEach((key)=>{
-    const input = form.querySelector(`input[name="${key}"]`);
-    if (!input) return;
-    const span = input.closest('label')?.querySelector('span.btn-secondary');
-    const proxy = input.nextElementSibling?.classList?.contains('img-proxy') ? input.nextElementSibling : null;
-    const text = t[key] ? '이미지 저장됨' : '파일 선택';
-    if (span) span.textContent = text;
-    if (proxy) proxy.textContent = text;
-  });
-}
-function ensureImageProxyButton(input){
-  // 파일 input 바로 뒤에 라벨이 없으면, 대체 버튼을 만들어 준다
-  const labelSpan = input.closest('label')?.querySelector('span.btn-secondary');
-  if (labelSpan) return labelSpan; // 기존 라벨 사용
-  // 이미 만들어둔 프록시가 있으면 반환
-  if (input.nextElementSibling && input.nextElementSibling.classList?.contains('img-proxy')) return input.nextElementSibling;
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'btn-secondary img-proxy';
-  btn.textContent = '파일 선택';
-  btn.style.marginLeft = '0.5rem';
-  input.insertAdjacentElement('afterend', btn);
-  return btn;
-}
-function setupImageManage() {
-  const form = $('#tradeForm'); if (!form) return;
-  ['image1','image2'].forEach(name=>{
-    const input = form.querySelector(`input[name="${name}"]`); if (!input) return;
-    const btnLike = ensureImageProxyButton(input); // 라벨 또는 프록시 버튼
-    btnLike.style.cursor = 'pointer';
-    btnLike.addEventListener('click', ()=>{
-      const txt = btnLike.textContent || '';
-      if (txt.includes('이미지 저장됨') || (txt && txt !== '파일 선택' && txt !== '삭제됨')) {
-        const del = confirm('이미지를 삭제할까요?\n확인 = 삭제, 취소 = 이미지 변경');
-        if (del) { btnLike.textContent = '삭제됨'; input.value = ''; form.dataset[name==='image1'?'clearImage1':'clearImage2']='1'; }
-        else { form.dataset[name==='image1'?'clearImage1':'clearImage2']='0'; input.click(); }
-      } else {
-        input.click();
-      }
-    });
-    input.addEventListener('change', ()=>{
-      const f = input.files && input.files[0];
-      btnLike.textContent = f ? f.name : '파일 선택';
-      form.dataset[name==='image1'?'clearImage1':'clearImage2'] = f ? '0' : form.dataset[name==='image1'?'clearImage1':'clearImage2'];
-    });
-  });
-}
-
-// -------------------- Month dropdown --------------------
-async function populateMonthSelect() {
-  const search = $('#searchInput');
-  const sort = $('#sortSelect');
-  if (search) search.style.flex = '1 1 auto';
-  if (sort) sort.style.width = '7.5rem';
-
-  const toolbar = search?.parentElement || null;
-  if (!toolbar) return;
-  let monthSel = $('#monthSelect');
-  if (!monthSel) {
-    monthSel = document.createElement('select');
-    monthSel.id = 'monthSelect'; monthSel.className = 'input'; monthSel.style.width = '7.5rem';
-    toolbar.appendChild(monthSel);
-    monthSel.addEventListener('change', renderList);
-  }
-  const data = await idbAll();
-  const months = Array.from(new Set(data.map(t=>monthKeyOf(t.date)).filter(Boolean))).sort().reverse();
-  const cur = monthSel.value || 'all';
-  monthSel.innerHTML = '';
-  const optAll = document.createElement('option'); optAll.value='all'; optAll.textContent='전체'; monthSel.appendChild(optAll);
-  months.forEach(key=>{
-    const opt = document.createElement('option'); opt.value = key; opt.textContent = monthLabel(key); monthSel.appendChild(opt);
-  });
-  if ([...monthSel.options].some(o=>o.value===cur)) monthSel.value = cur;
-}
+function fmtMan(n){ const sign=n<0?-1:1; const v=Math.floor(Math.abs(n)/1000)/10; if(v===0) return '0'; return (sign<0?'-':'')+(v%1===0?v.toFixed(0):v.toFixed(1))+'만'; }
 
 // -------------------- List --------------------
 async function renderList() {
-  // 분석/차트 제거(방어)
-  const kill = (el)=>{ if(!el) return; el.style.display='none'; el.innerHTML=''; };
-  kill(document.getElementById('analysisCard'));
-  document.querySelectorAll('.analysis,.simple-analysis,[data-analysis],canvas#pnlChart').forEach(kill);
-  document.querySelectorAll('.card,div,section').forEach(el=>{
-    const t = (el.textContent||'').trim(); if (t && t.includes('간단 분석')) kill(el);
-  });
+  killAnalysis();
+  ensureContainers();
 
-  const listHost = $('#listContainer'); if (!listHost) { console.warn('[Journal] #listContainer missing'); return; }
+  const host = $('#listContainer');
+  if (!host) { console.warn('[Journal] #listContainer still missing'); return; }
+
   const q = ($('#searchInput')?.value||'').trim().toLowerCase();
   const sortKey = $('#sortSelect')?.value || 'date_desc';
   const monthKey = $('#monthSelect') ? $('#monthSelect').value : 'all';
@@ -289,7 +161,7 @@ async function renderList() {
     const tagStr = (t.tags || '').toLowerCase();
     const sym = (t.symbol || '').toLowerCase();
     const okQuery = !q || tagStr.includes(q) || sym.includes(q);
-    const okMonth = monthKey === 'all' || monthKeyOf(t.date) === monthKey;
+    const okMonth = monthKey === 'all' || (t.date||'').slice(0,7) === monthKey;
     return okQuery && okMonth;
   });
 
@@ -320,9 +192,9 @@ async function renderList() {
     </tr>`);
   }
   table.push(`</tbody></table>`);
-  listHost.innerHTML = table.join('');
+  host.innerHTML = table.join('');
 
-  listHost.querySelectorAll('tr[data-id]').forEach(tr=>{
+  host.querySelectorAll('tr[data-id]').forEach(tr=>{
     tr.addEventListener('click', async ()=>{
       const id = Number(tr.getAttribute('data-id'));
       const rec = await idbGet(id);
@@ -332,8 +204,29 @@ async function renderList() {
 }
 
 // -------------------- Detail Modal --------------------
+function ensureZoomStyles(){
+  if (document.getElementById('zoom-style')) return;
+  const s = document.createElement('style'); s.id='zoom-style';
+  s.textContent = `.img-zoomed{position:fixed!important;inset:0!important;background:rgba(0,0,0,.85)!important;object-fit:contain!important;width:100vw!important;height:100vh!important;z-index:9999!important;cursor:zoom-out!important}`;
+  document.head.appendChild(s);
+}
+async function tryFullscreen(el){
+  try{
+    if (document.fullscreenElement === el || document.webkitFullscreenElement === el) {
+      if (document.exitFullscreen) await document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      return true;
+    } else {
+      if (el.requestFullscreen) { await el.requestFullscreen(); return true; }
+      else if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); return true; }
+    }
+  }catch(e){ /* ignore */ }
+  return false;
+}
+function toggleZoomFallback(el){ ensureZoomStyles(); el.classList.toggle('img-zoomed'); }
+
 function openDetail(t){
-  const host = safeEl('detailContent'); const modal = safeEl('detailModal');
+  const host = $('#detailContent'); const modal = $('#detailModal');
   if (!host || !modal) return;
 
   const pnl = formatPnL(t), r = rate(t), buyAmount = (Number(t.buy_price||0) * Number(t.qty||0));
@@ -367,21 +260,33 @@ function openDetail(t){
     });
   });
 
-  const closeBtn = document.getElementById('detailClose');
-  if (closeBtn) closeBtn.onclick = ()=> modal.classList.remove('show');
-
-  const editBtn = document.getElementById('detailEdit');
-  if (editBtn) editBtn.onclick = ()=>{
+  document.getElementById('detailClose')?.addEventListener('click', ()=> modal.classList.remove('show'));
+  document.getElementById('detailEdit')?.addEventListener('click', ()=>{
     modal.classList.remove('show');
-    const tabBtn = document.querySelector('.tab-btn[data-tab="input"]'); if (tabBtn) tabBtn.click();
-    const inputTab = document.getElementById('tab-input'); if (inputTab) inputTab.classList.remove('hidden');
-    fillForm(t);
-    const form = document.getElementById('tradeForm'); if (form) { form.scrollIntoView({behavior:'smooth', block:'start'}); form.querySelector('input[name="date"]')?.focus(); }
-  };
+    clickFormTab();
+    const form = document.getElementById('tradeForm');
+    if (form) {
+      // fill
+      form.id.value = t.id || '';
+      form.date.value = t.date || '';
+      form.symbol.value = t.symbol || '';
+      form.qty.value = t.qty ?? '';
+      form.buy_price.value = t.buy_price ?? '';
+      form.sell_price.value = t.sell_price ?? '';
+      form.comment.value = t.comment || '';
+      document.querySelectorAll('input[name="tags[]"]').forEach(ch => ch.checked = false);
+      if (t.tags) {
+        const set = new Set(String(t.tags).split(',').map(s=>s.trim()).filter(Boolean));
+        document.querySelectorAll('input[name="tags[]"]').forEach(ch => { if (set.has(ch.value)) ch.checked = true; });
+      }
+      form.scrollIntoView({behavior:'smooth', block:'start'});
+      form.querySelector('input[name="date"]')?.focus();
+    }
+  });
 }
 
-function closeDetail(){ const modal = $('#detailModal'); if (modal) modal.classList.remove('show'); }
-const modalRoot = $('#detailModal'); if (modalRoot) modalRoot.addEventListener('click', (e)=>{ if (e.target.id === 'detailModal') closeDetail(); });
+function closeDetail(){ $('#detailModal')?.classList.remove('show'); }
+$('#detailModal')?.addEventListener('click', (e)=>{ if (e.target.id === 'detailModal') closeDetail(); });
 
 // -------------------- Calendar --------------------
 let calendar;
@@ -407,8 +312,9 @@ function recomputeCalendarEvents(all) {
   return events;
 }
 async function initCalendar() {
+  ensureContainers();
   const calHost = $('#calendar');
-  if (!calHost) { console.warn('[Journal] #calendar not found'); return; }
+  if (!calHost) { console.warn('[Journal] #calendar still missing'); return; }
   if (typeof FullCalendar === 'undefined' || !FullCalendar?.Calendar) {
     console.warn('[Journal] FullCalendar not loaded; calendar disabled.');
     calHost.innerHTML = '<div class="text-slate-400 text-sm">캘린더 라이브러리가 로드되지 않아 달력을 표시할 수 없습니다.</div>';
@@ -442,12 +348,14 @@ async function refreshCalendar() {
     calendar.addEventSource(events);
   } catch (e) { console.error('[Journal] calendar refresh failed', e); }
 }
+
 async function renderCalendarList(dateStr) {
+  ensureContainers();
   const host = $('#calendarList'); if (!host) return;
   const all = await idbAll();
   const rows = all.filter(t => t.date === dateStr).sort((a,b)=> (a.created_at||'').localeCompare(b.created_at||''));
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
-  const out = [`<div class="card"><h3 class="font-semibold">${dateStr} 매매 (합계: ${total>=0?`<span class='pnl-pos'>{${fmtNumber(Math.round(total))}}</span>`:`<span class='pnl-neg'>{${fmtNumber(Math.round(total))}}</span>`})</h3>`,
+  const out = [`<div class="card"><h3 class="font-semibold">${dateStr} 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,
                `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr>
                  <th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];
   for (const t of rows) {
@@ -471,6 +379,7 @@ async function renderCalendarList(dateStr) {
   });
 }
 async function renderWeekList(weekStart) {
+  ensureContainers();
   const host = $('#calendarList'); if (!host) return;
   const ws = new Date(weekStart), we = new Date(ws); we.setDate(we.getDate()+6);
   const sKey = ws.toISOString().slice(0,10), eKey = we.toISOString().slice(0,10);
@@ -502,17 +411,57 @@ async function renderWeekList(weekStart) {
   });
 }
 
-// -------------------- Tabs --------------------
-function switchTab(name) {
-  const tabs = Array.from(document.querySelectorAll('[id^="tab-"]'));
-  tabs.forEach(sec=>sec.classList.add('hidden'));
-  const tab = document.getElementById('tab-' + name);
-  if (tab) tab.classList.remove('hidden');
-  $$('.tab-btn').forEach(btn=>btn.classList.remove('tab-active'));
-  const navBtn = document.querySelector(`[data-tab="${name}"]`);
-  if (navBtn) navBtn.classList.add('tab-active');
-  if (name === 'calendar') refreshCalendar();
-  if (name === 'list') renderList();
+// -------------------- Month select & image inputs --------------------
+async function populateMonthSelect() {
+  const search = $('#searchInput');
+  const sort = $('#sortSelect');
+  if (search) search.style.flex = '1 1 auto';
+  if (sort) sort.style.width = '7.5rem';
+
+  const toolbar = search?.parentElement || null;
+  if (!toolbar) return;
+  let monthSel = $('#monthSelect');
+  if (!monthSel) {
+    monthSel = document.createElement('select');
+    monthSel.id = 'monthSelect'; monthSel.className = 'input'; monthSel.style.width = '7.5rem';
+    toolbar.appendChild(monthSel);
+    monthSel.addEventListener('change', renderList);
+  }
+  const data = await idbAll();
+  const months = Array.from(new Set(data.map(t=>(t.date||'').slice(0,7)).filter(Boolean))).sort().reverse();
+  const cur = monthSel.value || 'all';
+  monthSel.innerHTML = '';
+  const optAll = document.createElement('option'); optAll.value='all'; optAll.textContent='전체'; monthSel.appendChild(optAll);
+  months.forEach(key=>{
+    const opt = document.createElement('option'); opt.value = key; opt.textContent = `${key.slice(0,4)}년 ${Number(key.slice(5))}월`; monthSel.appendChild(opt);
+  });
+  if ([...monthSel.options].some(o=>o.value===cur)) monthSel.value = cur;
+}
+
+function setupImageManage() {
+  const form = $('#tradeForm'); if (!form) return;
+  ['image1','image2'].forEach(name=>{
+    const input = form.querySelector(`input[name="${name}"]`); if (!input) return;
+    const span = input.closest('label')?.querySelector('span.btn-secondary');
+    const btn = span || (()=>{
+      const b = document.createElement('button'); b.type='button'; b.className='btn-secondary'; b.textContent='파일 선택';
+      input.insertAdjacentElement('afterend', b); return b;
+    })();
+    btn.style.cursor='pointer';
+    btn.addEventListener('click', ()=>{
+      const txt = btn.textContent || '';
+      if (txt.includes('이미지 저장됨') || (txt && txt !== '파일 선택' && txt !== '삭제됨')) {
+        const del = confirm('이미지를 삭제할까요?\n확인 = 삭제, 취소 = 이미지 변경');
+        if (del) { btn.textContent = '삭제됨'; input.value = ''; form.dataset[name==='image1'?'clearImage1':'clearImage2']='1'; }
+        else { form.dataset[name==='image1'?'clearImage1':'clearImage2']='0'; input.click(); }
+      } else { input.click(); }
+    });
+    input.addEventListener('change', ()=>{
+      const f = input.files && input.files[0];
+      btn.textContent = f ? f.name : '파일 선택';
+      form.dataset[name==='image1'?'clearImage1':'clearImage2'] = f ? '0' : form.dataset[name==='image1'?'clearImage1':'clearImage2'];
+    });
+  });
 }
 
 // -------------------- Export/Import --------------------
@@ -523,7 +472,6 @@ async function exportJSON() {
   const a = document.createElement('a'); a.href = url; a.download = 'trades_export.json'; a.click();
   URL.revokeObjectURL(url);
 }
-
 async function importJSON(file) {
   const text = await file.text();
   const obj = JSON.parse(text);
@@ -537,13 +485,18 @@ async function importJSON(file) {
 (async function init() {
   try {
     await openDB();
+
+    // 탭 버튼 연결
     $$('.tab-btn').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
     switchTab('list');
+
+    ensureContainers();
+    killAnalysis();
 
     await populateMonthSelect();
     setupImageManage();
 
-    // List controls (null-safe)
+    // List controls
     $('#searchInput')?.addEventListener('input', renderList);
     $('#sortSelect')?.addEventListener('change', renderList);
     $('#exportBtn')?.addEventListener('click', exportJSON);
@@ -561,8 +514,8 @@ async function importJSON(file) {
       if (editId) prev = await idbGet(editId);
       const clear1 = f.dataset.clearImage1 === '1';
       const clear2 = f.dataset.clearImage2 === '1';
-      const newImg1 = await compressFileToDataURL(f.image1?.files?.[0], {maxSide:2000, quality:0.85});
-      const newImg2 = await compressFileToDataURL(f.image2?.files?.[0], {maxSide:2000, quality:0.85});
+      const newImg1 = await (f.image1 ? compressFileToDataURL(f.image1.files?.[0], {maxSide:2000, quality:0.85}) : null);
+      const newImg2 = await (f.image2 ? compressFileToDataURL(f.image2.files?.[0], {maxSide:2000, quality:0.85}) : null);
       const img1 = newImg1 ?? (clear1 ? null : (prev ? prev.image1 : null));
       const img2 = newImg2 ?? (clear2 ? null : (prev ? prev.image2 : null));
       const tags = Array.from(document.querySelectorAll('input[name="tags[]"]:checked')).map(x=>x.value).join(',');
@@ -581,24 +534,30 @@ async function importJSON(file) {
       };
       if (payload.id) { await idbPut(payload); alert('수정 완료'); }
       else { await idbAdd(payload); alert('저장 완료'); }
-      clearForm();
+      // reset + rerender
+      f.reset(); f.id.value=''; f.dataset.clearImage1='0'; f.dataset.clearImage2='0';
       await populateMonthSelect(); await renderList(); await refreshCalendar();
       switchTab('list');
     });
 
-    $('#resetForm')?.addEventListener('click', clearForm);
+    $('#resetForm')?.addEventListener('click', ()=>{
+      const form = $('#tradeForm'); if (!form) return;
+      form.reset(); form.id.value=''; form.dataset.clearImage1='0'; form.dataset.clearImage2='0';
+    });
+
     $('#deleteTrade')?.addEventListener('click', async ()=>{
       const id = Number($('#tradeForm')?.id?.value);
       if (id && confirm('이 거래를 삭제할까요?')) {
         await idbDelete(id);
-        clearForm(); await populateMonthSelect(); await renderList(); await refreshCalendar(); switchTab('list');
+        const form = $('#tradeForm'); if (form) { form.reset(); form.id.value=''; }
+        await populateMonthSelect(); await renderList(); await refreshCalendar(); switchTab('list');
       }
     });
 
     await initCalendar();
     await renderList();
 
-    console.log('[Journal] init done (v12)');
+    console.log('[Journal] init done (v13)');
   } catch (err) {
     console.error('[Journal] fatal init error:', err);
     alert('스크립트 초기화 중 오류가 발생했어요. 콘솔을 확인해주세요.');
