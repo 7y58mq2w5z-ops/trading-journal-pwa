@@ -1,5 +1,5 @@
 // Service Worker for offline cache
-const CACHE_NAME = 'journal-cache-v3';
+const CACHE_NAME = 'journal-cache-v31';
 const ASSETS = [
   './',
   './index.html',
