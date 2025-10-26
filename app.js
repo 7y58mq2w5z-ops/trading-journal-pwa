@@ -1,11 +1,14 @@
-/* Trading Journal - v6.2
- * Tweaks from v6.1:
- * 1) '편집' 버튼 위치를 닫기 버튼과 살짝(약 1mm ≈ 4px) 띄움
- * 2) '편집' 클릭 시 폼으로 이동 후 날짜 입력에 자동 포커스 주지 않음(모바일 달력 뜨는 현상 방지)
+/* Trading Journal - v6.1b (based on v6.1)
+ * Minimal tweaks only:
+ * 1) '편집' 버튼을 닫기 버튼에서 약 1mm(≈4px) 더 떨어뜨림
+ * 2) '편집' 클릭 시 날짜 입력에 포커스를 주지 않음 (모바일 달력 자동 표시 방지)
+ *    → 대신 종목(symbol) 필드에 포커스를 줌
+ *
+ * This file should behave exactly like your working v6.1 except for the two tweaks above.
+ * Paste/replace over your current app.js (which was v6.1 base).
  */
 
-// ===== 기존 v6.1 코드에서 변경된 부분만 재정의 =====
-
+/* ===== v6.1 원본의 openDetail()만 최소 변경 ===== */
 function openDetail(t){
   const pnl = (Number(t.sell_price||0) - Number(t.buy_price||0)) * Number(t.qty||0);
   const r = t.buy_price ? ((Number(t.sell_price||0) / Number(t.buy_price||0)) - 1) * 100 : 0;
@@ -37,7 +40,7 @@ function openDetail(t){
   host.innerHTML = html;
   modal.classList.add('show');
 
-  // 확대(풀스크린/폴백)
+  // 확대(풀스크린/폴백) — v6.1과 동일
   function ensureZoomStyles(){
     if (document.getElementById('zoom-style')) return;
     const css = `.img-zoomed{position:fixed!important;inset:0!important;background:rgba(0,0,0,.85)!important;object-fit:contain!important;width:100vw!important;height:100vh!important;z-index:9999!important;cursor:zoom-out!important}`;
@@ -80,16 +83,13 @@ function openDetail(t){
   editBtn.type = 'button';
   editBtn.textContent = '편집';
 
-  // v6.1: top 3rem → v6.2: 3rem + 4px (약 1mm)
+  // v6.1: top 3rem → v6.1b: 3rem + 4px (약 1mm)
   editBtn.style.position = 'absolute';
   editBtn.style.right = '.75rem';
   editBtn.style.top   = 'calc(3rem + 4px)';
-  // 혹시 절대 배치가 아닌 흐름 배치가 더 어울리는 레이아웃이면 아래 한 줄로 대체 가능:
-  // editBtn.style.marginTop = '4px';
-
   closeBtn?.insertAdjacentElement('afterend', editBtn);
 
-  // ---- 편집 클릭 → 폼 탭 + 자동 채움 (자동 포커스는 심볼 필드로 변경) ----
+  // ---- 편집 클릭 → 폼 탭 + 자동 채움 (날짜 포커스 X, 종목 포커스 O) ----
   function fillForm(t){
     const form = document.getElementById('tradeForm');
     if (!form) return;
@@ -107,8 +107,6 @@ function openDetail(t){
     }
     const del = document.getElementById('deleteTrade');
     if (del) del.classList.toggle('hidden', !t.id);
-
-    // 이미지 라벨 텍스트 갱신
     ['image1','image2'].forEach((key)=>{
       const input = form.querySelector(`input[name="${key}"]`);
       const span = input?.closest('label')?.querySelector('span.btn-secondary');
@@ -119,22 +117,18 @@ function openDetail(t){
   editBtn.addEventListener('click', ()=>{
     // 모달 닫기
     modal.classList.remove('show');
-
-    // 폼 탭 열기
-    const formTabBtn = document.querySelector('[data-tab="form"]') || document.querySelector('[data-tab="input"]');
-    formTabBtn?.click();
-
+    // 폼 탭 열기 (form → input 순으로 탐색)
+    (document.querySelector('[data-tab="form"]') || document.querySelector('[data-tab="input"]'))?.click();
     // 값 채우기
     fillForm(t);
-
-    // 🔴 날짜 입력에 자동 포커스를 주지 않습니다(모바일 달력 팝업 방지)
-    // 대신 심볼(종목) 필드에 포커스 (또는 포커스 생략하려면 아래 줄을 주석 처리)
-    const formEl = document.getElementById('tradeForm');
-    formEl?.querySelector('input[name="symbol"]')?.focus({ preventScroll: false });
+    // 날짜 입력 포커스 제거 (모바일 달력 자동표시 방지)
+    // 대신 종목(symbol) 입력에 포커스
+    document.getElementById('tradeForm')?.querySelector('input[name="symbol"]')?.focus({ preventScroll:false });
   });
 
-  // 바깥 영역 클릭 시 닫기
+  // 바깥 영역 클릭 시 닫기 (v6.1과 동일)
   function closeDetail(){ modal.classList.remove('show'); }
+  document.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'detailClose') closeDetail(); }, { once:true });
   document.getElementById('detailModal').addEventListener('click', (e)=>{
     if (e.target.id === 'detailModal') closeDetail();
   }, { once:true });
