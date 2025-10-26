@@ -192,38 +192,57 @@ async function renderList() {
 }
 
 // ---------- Detail Modal ----------
+
 function openDetail(t){
   const pnl = formatPnL(t);
   const r = rate(t);
   const buyAmount = (Number(t.buy_price||0) * Number(t.qty||0));
   const html = `
-    <div class="space-y-2">
-      <div class="text-slate-500 text-sm">날짜</div>
-      <div class="font-medium">${t.date||''}</div>
-      <div class="text-slate-500 text-sm">종목명</div>
-      <div class="font-medium">${t.symbol||''}</div>
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <div class="text-slate-500 text-sm">수익률</div>
-          <div class="font-semibold">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</div>
-        </div>
-        <div>
-          <div class="text-slate-500 text-sm">수익금</div>
-          <div class="font-semibold">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</div>
-        </div>
+    <div class="detail-grid">
+      <div>
+        <div class="text-slate-500 text-sm">날짜</div>
+        <div class="font-medium">${t.date||''}</div>
       </div>
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <div class="text-slate-500 text-sm">매수금액</div>
-          <div class="font-medium">${fmtNumber(Math.round(buyAmount))}</div>
-        </div>
-        <div>
-          <div class="text-slate-500 text-sm">Tags</div>
-          <div class="font-medium">${t.tags||''}</div>
-        </div>
+      <div>
+        <div class="text-slate-500 text-sm">종목명</div>
+        <div class="font-medium">${t.symbol||''}</div>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-        ${t.image1?`<img id="img1" src="${t.image1}" class="rounded-xl shadow max-h-[60vh] w-full object-contain cursor-zoom-in">`:''}
+      <div>
+        <div class="text-slate-500 text-sm">수익률</div>
+        <div class="font-semibold">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</div>
+      </div>
+      <div>
+        <div class="text-slate-500 text-sm">수익금</div>
+        <div class="font-semibold">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</div>
+      </div>
+      <div>
+        <div class="text-slate-500 text-sm">매수금액</div>
+        <div class="font-medium">${fmtNumber(Math.round(buyAmount))}</div>
+      </div>
+      <div>
+        <div class="text-slate-500 text-sm">Tags</div>
+        <div class="font-medium">${t.tags||''}</div>
+      </div>
+      <div class="detail-images">
+        ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img">`:''}
+        ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img">`:''}
+      </div>
+    </div>`;
+  $('#detailContent').innerHTML = html;
+  const modal = $('#detailModal');
+  modal.classList.add('show');
+
+  function setupFS(id){
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', async (ev)=>{
+      ev.stopPropagation();
+      if (el.requestFullscreen) el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    });
+  }
+  setupFS('img1'); setupFS('img2');
+}
         ${t.image2?`<img id="img2" src="${t.image2}" class="rounded-xl shadow max-h-[60vh] w-full object-contain cursor-zoom-in">`:''}
       </div>
     </div>
@@ -244,13 +263,16 @@ function openDetail(t){
   setupFS('img1'); setupFS('img2');
 }
 
+
 function closeDetail(){
-  $('#detailModal').classList.add('hidden');
-  $('#detailModal').classList.remove('flex');
+  const modal = $('#detailModal');
+  modal.classList.remove('show');
 }
+
 document.addEventListener('click', (e)=>{
   if (e.target && e.target.id === 'detailClose') closeDetail();
 });
+
 document.getElementById('detailModal').addEventListener('click', (e)=>{
   if (e.target.id === 'detailModal') closeDetail();
 });
@@ -498,3 +520,5 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   // Calendar
   await initCalendar();
 })();
+// flag to confirm JS loaded
+window.__APP_OK__ = true;

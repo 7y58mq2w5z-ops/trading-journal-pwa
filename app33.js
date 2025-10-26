@@ -520,3 +520,5 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   // Calendar
   await initCalendar();
 })();
+// flag to confirm JS loaded
+window.__APP_OK__ = true;
