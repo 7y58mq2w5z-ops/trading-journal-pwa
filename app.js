@@ -1,8 +1,9 @@
-/* Trading Journal - v7
- * - Detail modal: '편집' 버튼 추가 (닫기 아래)
- * - 편집 클릭 시 입력 탭으로 이동, 폼 자동 채우기
- * - 이미지 개별 삭제 버튼(이미지1/이미지2) 추가: 선택 시 해당 이미지만 제거 저장
- * - 유지: 이미지 자동 리사이즈(2000px) + JPEG q=0.85, UI 조정 등
+/* Trading Journal - v8
+ * - 상세보기: 기존 닫기 버튼 아래에 '편집' 버튼만 추가 (하단 새 닫기 버튼 제거)
+ * - 편집 클릭 시 즉시 입력 탭을 보여주고 폼을 자동 채움 (빈 화면 방지)
+ * - 이미지 관리 UX 변경: '이미지 저장됨' 라벨 클릭 시 '삭제/변경' 동작 선택
+ *   (확인=삭제, 취소=변경 → 파일 선택창)
+ * - 유지: 이미지 자동 리사이즈(2000px, q=0.85), 검색/정렬/월 UI 조정 등
  */
 
 // ---------- Tiny IndexedDB helper ----------
@@ -75,7 +76,7 @@ function fmtPrice(n){
 // 만원 단위(한 자리 소수, 둘째자리 버림) 표시: -35000 => -3.5만
 function fmtMan(n){
   const sign = n < 0 ? -1 : 1;
-  const v = Math.floor(Math.abs(n) / 1000) / 10; // 10000 단위를 한 자리로, 둘째자리 버림
+  const v = Math.floor(Math.abs(n) / 1000) / 10;
   if (v === 0) return '0';
   return (sign<0?'-':'') + (v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)) + '만';
 }
@@ -140,7 +141,6 @@ function canvasToDataURL(canvas, mime='image/jpeg', quality=0.85){
 
 async function compressFileToDataURL(file, {maxSide=2000, quality=0.85} = {}){
   if (!file) return null;
-  // Skip very small files (<200KB) to save time and preserve quality
   if (file.size && file.size < 200*1024) {
     return await new Promise((resolve)=>{
       const r = new FileReader(); r.onload = ()=>resolve(r.result); r.readAsDataURL(file);
@@ -149,7 +149,6 @@ async function compressFileToDataURL(file, {maxSide=2000, quality=0.85} = {}){
   let img;
   try { img = await readFileAsImage(file); }
   catch {
-    // fallback: read as-is
     return await new Promise((resolve)=>{
       const r = new FileReader(); r.onload = ()=>resolve(r.result); r.readAsDataURL(file);
     });
@@ -182,7 +181,6 @@ function clearForm() {
     const span = inp.closest('label')?.querySelector('span.btn-secondary');
     if (span) span.textContent = '파일 선택';
   });
-  $$('.btn-clear-image').forEach(btn => btn.classList.add('hidden'));
 }
 
 function fillForm(t) {
@@ -206,41 +204,42 @@ function fillForm(t) {
     const input = form.querySelector(`input[name="${key}"]`);
     const span = input?.closest('label')?.querySelector('span.btn-secondary');
     if (span) span.textContent = t[key] ? '이미지 저장됨' : '파일 선택';
-    const clearBtn = input?.closest('label')?.querySelector('.btn-clear-image');
-    if (clearBtn) clearBtn.classList.toggle('hidden', !t[key]);
   });
 }
 
-// 이미지 삭제 버튼/동작 주입
-function setupImageClearButtons() {
+// '이미지 저장됨' 클릭 → 삭제/변경 선택
+function setupImageManage() {
   const form = $('#tradeForm');
   ['image1','image2'].forEach(name=>{
     const input = form.querySelector(`input[name="${name}"]`);
     if (!input) return;
-    let clearBtn = input.closest('label')?.querySelector('.btn-clear-image');
-    if (!clearBtn) {
-      clearBtn = document.createElement('button');
-      clearBtn.type = 'button';
-      clearBtn.className = 'btn-secondary btn-clear-image hidden';
-      clearBtn.textContent = '이미지 삭제';
-      input.closest('label')?.appendChild(clearBtn);
-      clearBtn.addEventListener('click', ()=>{
-        // 표시만 ‘삭제됨’으로 바꾸고, 제출 시 실제 null 저장
-        const span = input.closest('label')?.querySelector('span.btn-secondary');
-        if (span) span.textContent = '삭제됨';
-        input.value = ''; // 새 파일 선택 비움
-        form.dataset[name === 'image1' ? 'clearImage1' : 'clearImage2'] = '1';
-        clearBtn.classList.remove('hidden');
-      });
-    }
-    // 파일 새로 선택하면 삭제 플래그 해제 + 버튼 숨김
+    const span = input.closest('label')?.querySelector('span.btn-secondary');
+    if (!span) return;
+    span.style.cursor = 'pointer';
+    span.addEventListener('click', ()=>{
+      const txt = span.textContent || '';
+      if (txt.includes('이미지 저장됨') || txt !== '파일 선택') {
+        const del = confirm('이미지를 삭제할까요?\\n확인 = 삭제, 취소 = 이미지 변경');
+        if (del) {
+          // 삭제
+          span.textContent = '삭제됨';
+          input.value = '';
+          form.dataset[name === 'image1' ? 'clearImage1' : 'clearImage2'] = '1';
+        } else {
+          // 변경: 파일 선택창 열기
+          form.dataset[name === 'image1' ? 'clearImage1' : 'clearImage2'] = '0';
+          input.click();
+        }
+      } else {
+        // 아직 파일 없음 → 파일 선택
+        input.click();
+      }
+    });
+    // 실제 파일 선택 시 라벨 갱신
     input.addEventListener('change', ()=>{
-      form.dataset[name === 'image1' ? 'clearImage1' : 'clearImage2'] = '0';
-      const span = input.closest('label')?.querySelector('span.btn-secondary');
       const f = input.files && input.files[0];
-      if (span) span.textContent = f ? f.name : '파일 선택';
-      const btn = input.closest('label')?.querySelector('.btn-clear-image');
-      if (btn) btn.classList.toggle('hidden', !(f));
+      span.textContent = f ? f.name : '파일 선택';
+      form.dataset[name === 'image1' ? 'clearImage1' : 'clearImage2'] = f ? '0' : form.dataset[name === 'image1' ? 'clearImage1' : 'clearImage2'];
     });
   });
 }
@@ -388,14 +387,11 @@ function openDetail(t){
         ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
         ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
       </div>
-      <div class="mt-4 flex gap-2 justify-end">
-        <button id="detailEdit" class="btn-primary">편집</button>
-        <button id="detailClose" class="btn-secondary">닫기</button>
-      </div>
     </div>`;
   $('#detailContent').innerHTML = html;
   $('#detailModal').classList.add('show');
 
+  // 확대
   function attachZoomHandler(id){
     const el = document.getElementById(id);
     if (!el) return;
@@ -408,23 +404,32 @@ function openDetail(t){
   }
   attachZoomHandler('img1'); attachZoomHandler('img2');
 
-  // 편집 버튼 → 입력 탭으로 이동 + 폼 채우기
-  const editBtn = document.getElementById('detailEdit');
-  if (editBtn) {
+  // 기존 닫기 버튼 아래에 '편집' 삽입 (중복 방지 후 재삽입)
+  const oldEdit = document.getElementById('detailEdit');
+  if (oldEdit) oldEdit.remove();
+  const closeBtn = document.getElementById('detailClose');
+  if (closeBtn) {
+    const editBtn = document.createElement('button');
+    editBtn.id = 'detailEdit';
+    editBtn.className = 'btn-primary mt-2';
+    editBtn.textContent = '편집';
+    closeBtn.insertAdjacentElement('afterend', editBtn);
     editBtn.addEventListener('click', ()=>{
       closeDetail();
-      // 입력 탭 이름이 'input' 이라고 가정. 없으면 스크롤만 처리.
+      // 입력 탭 바로 표시 + 폼 채우기
+      const container = document.getElementById('tab-input');
+      if (container) container.classList.remove('hidden');
+      // 탭 스위치(가능한 경우)
       try { switchTab('input'); } catch {}
       fillForm(t);
       const form = document.getElementById('tradeForm');
-      if (form) form.scrollIntoView({behavior:'smooth', block:'start'});
+      if (form) { form.scrollIntoView({behavior:'smooth', block:'start'}); form.querySelector('input[name="date"]')?.focus(); }
     });
   }
 
+  // ESC: 폴백 확대 해제
   document.addEventListener('keydown', (e)=>{
-    if (e.key === 'Escape') {
-      document.querySelectorAll('.img-zoomed').forEach(x=>x.classList.remove('img-zoomed'));
-    }
+    if (e.key === 'Escape') document.querySelectorAll('.img-zoomed').forEach(x=>x.classList.remove('img-zoomed'));
   }, { once:true });
 }
 
@@ -573,12 +578,16 @@ async function renderWeekList(weekStart) {
 
 // ---------- Tab logic ----------
 function switchTab(name) {
-  $$('.card').forEach(sec=>sec.classList.add('hidden'));
+  // 탭 컨텐트는 #tab-* 로 가정
+  const tabs = Array.from(document.querySelectorAll('[id^="tab-"]'));
+  tabs.forEach(sec=>sec.classList.add('hidden'));
   const tab = document.getElementById('tab-' + name);
   if (tab) tab.classList.remove('hidden');
+
   $$('.tab-btn').forEach(btn=>btn.classList.remove('tab-active'));
   const navBtn = document.querySelector(`[data-tab="${name}"]`);
   if (navBtn) navBtn.classList.add('tab-active');
+
   if (name === 'calendar') refreshCalendar();
   if (name === 'list') renderList();
 }
@@ -631,18 +640,18 @@ window.addEventListener('beforeinstallprompt', (e)=>{
 
   await populateMonthSelect();
 
-  // 이미지 삭제 버튼/행동 주입
-  setupImageClearButtons();
+  // 이미지 라벨 클릭 관리
+  setupImageManage();
 
-  // 파일 선택 시 버튼 라벨 갱신
+  // 파일 선택 시 버튼 라벨 갱신(중복 안전)
   const form = $('#tradeForm');
   ['image1','image2'].forEach(name=>{
     const input = form.querySelector(`input[name="${name}"]`);
     if (!input) return;
-    const labelSpan = input.closest('label')?.querySelector('span.btn-secondary');
+    const span = input.closest('label')?.querySelector('span.btn-secondary');
     input.addEventListener('change', ()=>{
       const f = input.files && input.files[0];
-      if (labelSpan) labelSpan.textContent = f ? f.name : '파일 선택';
+      if (span) span.textContent = f ? f.name : '파일 선택';
     });
   });
 
@@ -654,7 +663,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     if (e.target.files && e.target.files[0]) importJSON(e.target.files[0]);
   });
 
-  // Form submit with compression (HQ profile: 2000px, q=0.85)
+  // Form submit with compression
   $('#tradeForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
     const f = e.target;
@@ -689,7 +698,6 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     };
     if (payload.id) { await idbPut(payload); alert('수정 완료'); }
     else { await idbAdd(payload); alert('저장 완료'); }
-
     clearForm();
     await populateMonthSelect();
     await renderList();
