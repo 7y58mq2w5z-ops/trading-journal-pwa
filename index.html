@@ -54,10 +54,8 @@
           </div>
         </fieldset>
 
-        <!-- Comment label 제거 & 가로 꽉 차게 -->
         <textarea name="comment" rows="3" class="input w-full" placeholder=""></textarea>
 
-        <!-- 파일 입력: 커스텀 버튼 -->
         <div class="grid grid-cols-2 gap-2">
           <label class="label relative overflow-hidden">이미지1
             <span class="btn-secondary inline-block text-center">파일 선택</span>
@@ -122,12 +120,12 @@
     </div>
   </div>
 
-  <script src="app33.js"></script>
-<script>if(!window.__APP_OK__){var s=document.createElement("script");s.src="app.js?v=fallback";document.body.appendChild(s);}</script>
+  <!-- JS 로드 -->
+  <script type="module" src="./app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js');
+        navigator.serviceWorker.register('./sw.js');
       });
     }
   </script>
