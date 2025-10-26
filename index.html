@@ -41,12 +41,32 @@
           <label class="label">매수가 <input type="number" name="buy_price" step="0.01" class="input" value="0"></label>
           <label class="label">매도가 <input type="number" name="sell_price" step="0.01" class="input" value="0"></label>
         </div>
-        <label class="label">Tags(콤마) <input type="text" name="tags" class="input" placeholder="예: 단타, 뉴스, 실험"></label>
-        <label class="label">Comment <textarea name="comment" rows="3" class="input"></textarea></label>
 
+        <fieldset class="label">
+          <legend class="mb-1">Tags</legend>
+          <div class="grid grid-cols-3 gap-2 text-sm">
+            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="뇌동"> 뇌동</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="급함"> 급함</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="큰손실"> 큰손실</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="눌림"> 눌림</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="돌파"> 돌파</label>
+            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="굿매매"> 굿매매</label>
+          </div>
+        </fieldset>
+
+        <!-- Comment label 제거 & 가로 꽉 차게 -->
+        <textarea name="comment" rows="3" class="input w-full" placeholder=""></textarea>
+
+        <!-- 파일 입력: 기본 텍스트 숨기고 커스텀 버튼만 보이게 -->
         <div class="grid grid-cols-2 gap-2">
-          <label class="label">이미지1 <input type="file" name="image1" accept="image/*" class="input"></label>
-          <label class="label">이미지2 <input type="file" name="image2" accept="image/*" class="input"></label>
+          <label class="label relative overflow-hidden">이미지1
+            <span class="btn-secondary inline-block text-center">파일 선택</span>
+            <input type="file" name="image1" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
+          </label>
+          <label class="label relative overflow-hidden">이미지2
+            <span class="btn-secondary inline-block text-center">파일 선택</span>
+            <input type="file" name="image2" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
+          </label>
         </div>
 
         <div class="flex gap-2 mt-2">

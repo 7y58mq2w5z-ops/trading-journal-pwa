@@ -71,6 +71,8 @@ function clearForm() {
   const form = $('#tradeForm');
   form.reset();
   form.id.value = '';
+  // clear tag checks
+  document.querySelectorAll('input[name="tags[]"]').forEach(ch => ch.checked = false);
   $('#deleteTrade').classList.add('hidden');
 }
 
@@ -82,8 +84,13 @@ function fillForm(t) {
   form.qty.value = t.qty || 1;
   form.buy_price.value = t.buy_price ?? 0;
   form.sell_price.value = t.sell_price ?? 0;
-  form.tags.value = t.tags || '';
   form.comment.value = t.comment || '';
+  // tags -> checkboxes
+  document.querySelectorAll('input[name="tags[]"]').forEach(ch => { ch.checked = false; });
+  if (t.tags) {
+    const set = new Set(String(t.tags).split(',').map(s=>s.trim()).filter(Boolean));
+    document.querySelectorAll('input[name="tags[]"]').forEach(ch => { if (set.has(ch.value)) ch.checked = true; });
+  }
   $('#deleteTrade').classList.toggle('hidden', !t.id);
 }
 
@@ -158,7 +165,7 @@ async function renderList() {
     });
   });
 
-  // Chart: daily sum trend (last 30 days if available)
+  // Chart: daily sum trend
   const byDate = {};
   for (const t of data) {
     if (!t.date) continue;
@@ -188,7 +195,6 @@ function recomputeCalendarEvents(all) {
   });
 
   // Weekly sums: place on Saturday
-  // Week = Mon..Sun; Saturday index = 5 relative to Monday start
   const events = [];
   const dates = Object.keys(sums).sort();
   for (const d of dates) {
@@ -210,6 +216,7 @@ function recomputeCalendarEvents(all) {
       weekStart.setDate(weekStart.getDate() - ((weekStart.getDay()+6)%7)); // Monday
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate()+6);
+
       const keyStart = weekStart.toISOString().slice(0,10);
       const keyEnd = weekEnd.toISOString().slice(0,10);
 
@@ -219,7 +226,7 @@ function recomputeCalendarEvents(all) {
       }
       const saturday = new Date(weekStart);
       saturday.setDate(saturday.getDate()+5);
-      events.push({
+      events.append = events.push({
         title: `주간 ${Math.round(sum)}`,
         start: saturday.toISOString().slice(0,10),
         allDay: true,
@@ -329,8 +336,7 @@ async function importJSON(file) {
   const obj = JSON.parse(text);
   if (!obj || !Array.isArray(obj.trades)) return;
   for (const t of obj.trades) {
-    // remove id to avoid collision; let DB assign new id
-    delete t.id;
+    delete t.id; // prevent id collision
     await idbAdd(t);
   }
   await renderList();
@@ -374,6 +380,10 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     const f = e.target;
     const image1 = await fileToDataURL(f.image1.files[0]);
     const image2 = await fileToDataURL(f.image2.files[0]);
+
+    // collect tags from checkboxes
+    const tags = Array.from(document.querySelectorAll('input[name="tags[]"]:checked')).map(x=>x.value).join(',');
+
     const payload = {
       id: f.id.value ? Number(f.id.value) : undefined,
       date: f.date.value,
@@ -381,7 +391,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
       qty: Number(f.qty.value||0),
       buy_price: Number(f.buy_price.value||0),
       sell_price: Number(f.sell_price.value||0),
-      tags: f.tags.value.trim(),
+      tags,
       comment: f.comment.value,
       image1,
       image2,
