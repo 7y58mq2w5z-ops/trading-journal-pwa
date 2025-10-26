@@ -1,13 +1,14 @@
-/* Trading Journal - v6.1 (detail '편집' button + edit flow) [patched]
- * - Keeps the existing '편집' button position as-is (right under 닫기)
- * - When entering edit mode, DOES NOT focus the date input (prevents calendar popup)
- * - Adds a small blur on entry to edit mode to ensure no input is focused
- * - Edit mode footer already provides: 저장(Submit) / 삭제(#deleteTrade) / 취소(#resetForm)
+/* Trading Journal - v6.1 (detail '편집' button + edit flow)
+ * - Adds an '편집' button **right below** the existing 닫기 button in the detail modal
+ * - On click, immediately opens the 입력(폼) 탭 and pre-fills values for editing
+ * - No other behaviors changed
  */
 
-/* ====== EXISTING CODE (from v6) ======
- * (Keep existing helpers/DB/functions as-is; only minimal changes were made below)
- */
+// ====== EXISTING CODE (from v6) ======
+// (Keep existing helpers/DB/functions as-is; we only add small changes below)
+// NOTE: This file is meant to REPLACE your current app.js entirely.
+// I inlined the minimal portions we need to modify and appended the new logic
+// to your existing openDetail() flow. Everything else remains the same from v6.
 
 // ---------- Tiny IndexedDB helper ----------
 const DB_NAME = 'journal-db';
@@ -253,12 +254,12 @@ async function renderList() {
   for (const t of rows) {
     const pnl = formatPnL(t);
     const r = rate(t);
-    table.push(`<tr class="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" data-id="\${t.id}">
-      <td class="py-1 pr-3 nowrap">\${fmtDateNoYear(t.date)}</td>
-      <td class="py-1 pr-3 nowrap">\${t.symbol||''}</td>
-      <td class="py-1 pr-3 nowrap text-right">\${r>=0?`<span class="pnl-pos">\${r.toFixed(2)}%</span>`:`<span class="pnl-neg">\${r.toFixed(2)}%</span>`}</td>
-      <td class="py-1 pr-3 nowrap text-right">\${pnl>=0?`<span class="pnl-pos">\${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">\${fmtNumber(Math.round(pnl))}</span>`}</td>
-      <td class="py-1 pr-3 nowrap">\${t.tags||''}</td>
+    table.push(`<tr class="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" data-id="${t.id}">
+      <td class="py-1 pr-3 nowrap">${fmtDateNoYear(t.date)}</td>
+      <td class="py-1 pr-3 nowrap">${t.symbol||''}</td>
+      <td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
+      <td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
+      <td class="py-1 pr-3 nowrap">${t.tags||''}</td>
     </tr>`);
   }
   table.push(`</tbody></table>`);
@@ -297,31 +298,31 @@ function openDetail(t){
     <div class="detail-grid">
       <div>
         <div class="text-slate-500 text-sm">날짜</div>
-        <div class="font-medium">\${t.date||''}</div>
+        <div class="font-medium">${t.date||''}</div>
       </div>
       <div>
         <div class="text-slate-500 text-sm">종목명</div>
-        <div class="font-medium">\${t.symbol||''}</div>
+        <div class="font-medium">${t.symbol||''}</div>
       </div>
       <div>
         <div class="text-slate-500 text-sm">수익률</div>
-        <div class="font-semibold">\${r>=0?`<span class="pnl-pos">\${r.toFixed(2)}%</span>`:`<span class="pnl-neg">\${r.toFixed(2)}%</span>`}</div>
+        <div class="font-semibold">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</div>
       </div>
       <div>
         <div class="text-slate-500 text-sm">수익금</div>
-        <div class="font-semibold">\${pnl>=0?`<span class="pnl-pos">\${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">\${fmtNumber(Math.round(pnl))}</span>`}</div>
+        <div class="font-semibold">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</div>
       </div>
       <div>
         <div class="text-slate-500 text-sm">매수금액</div>
-        <div class="font-medium">\${fmtNumber(Math.round(buyAmount))}</div>
+        <div class="font-medium">${fmtNumber(Math.round(buyAmount))}</div>
       </div>
       <div>
         <div class="text-slate-500 text-sm">Tags</div>
-        <div class="font-medium">\${t.tags||''}</div>
+        <div class="font-medium">${t.tags||''}</div>
       </div>
       <div class="detail-images" style="display:flex;gap:.75rem;">
-        \${t.image1?`<img id="img1" src="\${t.image1}" class="detail-img" style="width:50%;">`:''}
-        \${t.image2?`<img id="img2" src="\${t.image2}" class="detail-img" style="width:50%;">`:''}
+        ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
+        ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
       </div>
     </div>`;
   $('#detailContent').innerHTML = html;
@@ -341,39 +342,38 @@ function openDetail(t){
   }
   attachZoomHandler('img1'); attachZoomHandler('img2');
 
-  // ---- '편집' button (kept RIGHT BELOW the existing close button) ----
+  // ---- NEW: insert '편집' button RIGHT BELOW the existing close button ----
   const closeBtn = document.getElementById('detailClose');
+  // Ensure the modal card is relatively positioned so we can align buttons on the top-right stack
   const modalCard = closeBtn?.closest('.modal-card');
   if (modalCard) { modalCard.style.position = 'relative'; }
+  // Create the edit button
   let editBtn = document.getElementById('detailEdit');
   if (editBtn) editBtn.remove(); // avoid duplicates
   editBtn = document.createElement('button');
   editBtn.id = 'detailEdit';
   editBtn.className = 'btn-secondary';
   editBtn.textContent = '편집';
+  // place it visually "right below" the close button area
   editBtn.style.position = 'absolute';
   editBtn.style.right = '.75rem';
-  editBtn.style.top = '3rem'; // stays under the close button
+  editBtn.style.top = '3rem'; // close button is at .75rem; this sits right under it
+  // Make sure it's keyboard-accessible
   editBtn.setAttribute('type', 'button');
   closeBtn?.insertAdjacentElement('afterend', editBtn);
 
-  // Edit click -> open form tab & prefill (NO date focus; blur to avoid calendar popup)
+  // Edit click -> open form tab & prefill
   editBtn.addEventListener('click', ()=>{
+    // close modal
     modal.classList.remove('show');
+    // switch to form tab
     const formTabBtn = document.querySelector('[data-tab="form"]') || document.querySelector('[data-tab="input"]');
     formTabBtn?.click();
+    // prefill
     fillForm(t);
-
-    // --- Prevent any focus that could trigger the calendar popup ---
     const formEl = document.getElementById('tradeForm');
-    // Do NOT focus the date input. Instead, actively blur whatever is focused.
-    if (formEl) {
-      const dateInput = formEl.querySelector('input[name="date"]');
-      try { dateInput && dateInput.blur(); } catch (e) {}
-    }
-    try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
-    // In case the tab switch auto-focuses any field, blur again on next tick.
-    setTimeout(()=>{ try { document.activeElement && document.activeElement.blur(); } catch(e) {} }, 0);
+    formEl?.scrollIntoView({behavior:'smooth', block:'start'});
+    formEl?.querySelector('input[name="date"]');// focus removed
   });
 
   // Close actions
@@ -461,18 +461,18 @@ async function renderCalendarList(dateStr) {
   const all = await idbAll();
   const rows = all.filter(t => t.date === dateStr).sort((a,b)=> (a.created_at||'').localeCompare(b.created_at||''));
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
-  const out = [`<div class="card"><h3 class="font-semibold">\${dateStr} 매매 (합계: \${total>=0?`<span class='pnl-pos'>\${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>\${fmtNumber(Math.round(total))}</span>`})</h3>`,
+  const out = [`<div class="card"><h3 class="font-semibold">${dateStr} 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,
                `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr>
                  <th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];
   for (const t of rows) {
     const pnl = formatPnL(t), r = rate(t);
     out.push(`<tr class="border-t border-slate-100">
-      <td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="\${t.id}">\${t.symbol}</button></td>
-      <td class="py-1 pr-3 nowrap text-right">\${r>=0?`<span class="pnl-pos">\${r.toFixed(2)}%</span>`:`<span class="pnl-neg">\${r.toFixed(2)}%</span>`}</td>
-      <td class="py-1 pr-3 nowrap text-right">\${pnl>=0?`<span class="pnl-pos">\${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">\${fmtNumber(Math.round(pnl))}</span>`}</td>
-      <td class="py-1 pr-3 nowrap">\${fmtNumber(t.qty)}</td>
-      <td class="py-1 pr-3 nowrap">\${fmtPrice(t.buy_price)}</td>
-      <td class="py-1 pr-3 nowrap">\${fmtPrice(t.sell_price)}</td></tr>`);
+      <td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button></td>
+      <td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
+      <td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
+      <td class="py-1 pr-3 nowrap">${fmtNumber(t.qty)}</td>
+      <td class="py-1 pr-3 nowrap">${fmtPrice(t.buy_price)}</td>
+      <td class="py-1 pr-3 nowrap">${fmtPrice(t.sell_price)}</td></tr>`);
   }
   out.push(`</tbody></table></div>`);
   const host = document.getElementById('calendarList');
@@ -495,19 +495,19 @@ async function renderWeekList(weekStart) {
   const rows = all.filter(t => t.date >= sKey && t.date <= eKey)
                   .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
-  const out = [`<div class="card"><h3 class="font-semibold">\${sKey} ~ \${eKey} 주간 매매 (합계: \${total>=0?`<span class='pnl-pos'>\${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>\${fmtNumber(Math.round(total))}</span>`})</h3>`,
+  const out = [`<div class="card"><h3 class="font-semibold">${sKey} ~ ${eKey} 주간 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,
                `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr>
                  <th class="py-1 pr-3 nowrap">날짜</th><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];
   for (const t of rows) {
     const pnl = formatPnL(t), r = rate(t);
     out.push(`<tr class="border-t border-slate-100">
-      <td class="py-1 pr-3 nowrap">\${fmtDateNoYear(t.date)}</td>
-      <td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="\${t.id}">\${t.symbol}</button></td>
-      <td class="py-1 pr-3 nowrap text-right">\${r>=0?`<span class="pnl-pos">\${r.toFixed(2)}%</span>`:`<span class="pnl-neg">\${r.toFixed(2)}%</span>`}</td>
-      <td class="py-1 pr-3 nowrap text-right">\${pnl>=0?`<span class="pnl-pos">\${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">\${fmtNumber(Math.round(pnl))}</span>`}</td>
-      <td class="py-1 pr-3 nowrap">\${fmtNumber(t.qty)}</td>
-      <td class="py-1 pr-3 nowrap">\${fmtPrice(t.buy_price)}</td>
-      <td class="py-1 pr-3 nowrap">\${fmtPrice(t.sell_price)}</td></tr>`);
+      <td class="py-1 pr-3 nowrap">${fmtDateNoYear(t.date)}</td>
+      <td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button></td>
+      <td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
+      <td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
+      <td class="py-1 pr-3 nowrap">${fmtNumber(t.qty)}</td>
+      <td class="py-1 pr-3 nowrap">${fmtPrice(t.buy_price)}</td>
+      <td class="py-1 pr-3 nowrap">${fmtPrice(t.sell_price)}</td></tr>`);
   }
   out.push(`</tbody></table></div>`);
   const host = document.getElementById('calendarList');
@@ -526,7 +526,7 @@ function switchTab(name) {
   $$('.card').forEach(sec=>sec.classList.add('hidden'));
   $('#tab-' + name).classList.remove('hidden');
   $$('.tab-btn').forEach(btn=>btn.classList.remove('tab-active'));
-  const navBtn = document.querySelector(`[data-tab="\${name}"]`);
+  const navBtn = document.querySelector(`[data-tab="${name}"]`);
   if (navBtn) navBtn.classList.add('tab-active');
   if (name === 'calendar') refreshCalendar();
   if (name === 'list') renderList();
@@ -581,7 +581,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
 
   const form = $('#tradeForm');
   ['image1','image2'].forEach(name=>{
-    const input = form.querySelector(`input[name="\${name}"]`);
+    const input = form.querySelector(`input[name="${name}"]`);
     if (!input) return;
     const labelSpan = input.closest('label')?.querySelector('span.btn-secondary');
     input.addEventListener('change', ()=>{
