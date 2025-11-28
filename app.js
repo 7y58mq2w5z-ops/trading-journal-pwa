@@ -515,28 +515,76 @@ async function renderCalendarList(dateStr) {
 
 async function renderWeekList(weekStart) {
   const ws = new Date(weekStart);
-  const we = new Date(ws); we.setDate(we.getDate()+6);
+  const we = new Date(ws); 
+  we.setDate(we.getDate()+6);
+
   const sKey = ws.toISOString().slice(0,10);
   const eKey = we.toISOString().slice(0,10);
+
   const all = await idbAll();
-  const rows = all.filter(t => t.date >= sKey && t.date <= eKey)
-                  .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  const rows = all
+      .filter(t => t.date >= sKey && t.date <= eKey)
+      .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
-  const out = [`<div class="card"><h3 class="font-semibold">${sKey} ~ ${eKey} 주간 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,
-               `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr>
-                 <th class="py-1 pr-3 nowrap">날짜</th><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];
+
+  const out = [
+`<div class="card">
+  <h3 class="font-semibold">
+    ${sKey} ~ ${eKey} 주간 매매 (합계: ${
+      total>=0 ? `<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`
+               : `<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`
+    })
+  </h3>`,
+
+`<table class="min-w-full text-sm mt-2">
+  <thead class="text-slate-500">
+    <tr>
+      <th class="py-1 pr-3 nowrap">날짜</th>
+      <th class="py-1 pr-3 nowrap">종목</th>
+      <th class="py-1 pr-3 nowrap text-right">수익률</th>
+      <th class="py-1 pr-3 nowrap text-right">손익</th>
+      <th class="py-1 pr-3 nowrap">태그</th>
+    </tr>
+  </thead>
+  <tbody>`
+  ];
+
   for (const t of rows) {
-    const pnl = formatPnL(t), r = rate(t);
-    out.push(`<tr class="border-t border-slate-100">
-      <td class="py-1 pr-3 nowrap">${fmtDateNoYear(t.date)}</td>
-      <td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button></td>
-      <td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
-      <td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
-      <td class="py-1 pr-3 nowrap">${t.tags||''}</td></tr>`);
+    const pnl = formatPnL(t);
+    const r = rate(t);
+
+    out.push(`
+      <tr class="border-t border-slate-100">
+        <td class="py-1 pr-3 nowrap">${fmtDateNoYear(t.date)}</td>
+        <td class="py-1 pr-3 nowrap">
+          <button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button>
+        </td>
+        <td class="py-1 pr-3 nowrap text-right">
+          ${
+            r>=0
+            ? `<span class="pnl-pos">${r.toFixed(2)}%</span>`
+            : `<span class="pnl-neg">${r.toFixed(2)}%</span>`
+          }
+        </td>
+        <td class="py-1 pr-3 nowrap text-right">
+          ${
+            pnl>=0
+            ? `<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`
+            : `<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`
+          }
+        </td>
+        <td class="py-1 pr-3 nowrap">${t.tags || ''}</td>
+      </tr>
+    `);
   }
+
   out.push(`</tbody></table></div>`);
+
   const host = document.getElementById('calendarList');
   host.innerHTML = out.join('');
+
+  // 클릭 → 상세 보기
   host.querySelectorAll('.link-symbol').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = Number(btn.getAttribute('data-id'));
@@ -545,7 +593,6 @@ async function renderWeekList(weekStart) {
     });
   });
 }
-
 // ---------- Tab logic ----------
 function switchTab(name) {
   $$('.card').forEach(sec=>sec.classList.add('hidden'));
