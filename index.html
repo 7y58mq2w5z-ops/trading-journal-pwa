@@ -189,5 +189,34 @@
       });
     }
   </script>
+  <!-- 일자별 메모/이미지 모달 -->
+<div id="noteModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+  <div class="bg-white p-4 rounded-xl w-full max-w-lg relative">
+
+    <!-- 닫기 버튼 -->
+    <button id="noteClose" class="absolute right-3 top-2 text-slate-500 text-xl">&times;</button>
+
+    <h3 class="text-lg font-semibold mb-3">일자 메모 및 이미지</h3>
+
+    <!-- 메모 -->
+    <textarea id="noteText" class="w-full border rounded p-2 mb-3" rows="4"
+              placeholder="오늘 흐름 또는 지수 흐름 요약을 기록하세요"></textarea>
+
+    <!-- 이미지 2개 나란히 -->
+    <div class="flex gap-2">
+      <div class="w-1/2">
+        <input type="file" id="img1" accept="image/*" class="mb-1">
+        <img id="imgPrev1" class="w-full rounded cursor-pointer hidden">
+      </div>
+      <div class="w-1/2">
+        <input type="file" id="img2" accept="image/*" class="mb-1">
+        <img id="imgPrev2" class="w-full rounded cursor-pointer hidden">
+      </div>
+    </div>
+
+  </div>
+</div>
 </body>
 </html>
+
+
