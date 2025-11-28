@@ -489,150 +489,54 @@ async function refreshCalendar() {
 
 async function renderCalendarList(dateStr) {
   const all = await idbAll();
-  const rows = all.filter(t => t.date === dateStr)
-                  .sort((a,b)=> (a.created_at||'').localeCompare(b.created_at||''));
-
+  const rows = all.filter(t => t.date === dateStr).sort((a,b)=> (a.created_at||'').localeCompare(b.created_at||''));
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
-
-  const out = [`
-    <div class="card">
-      <h3 class="font-semibold flex justify-between items-center">
-        <span>${dateStr} 매매 (합계: ${
-          total >= 0
-            ? `<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`
-            : `<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`
-        })</span>
-
-        <button id="openDayNote" class="p-1 hover:bg-slate-100 rounded" title="일별 메모/이미지">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
-               viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round"
-              d="M3 3v18h18M7 14l3-3 4 4 4-6" />
-          </svg>
-        </button>
-      </h3>
-  `,
-  `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr>
-     <th class="py-1 pr-3 nowrap">종목</th>
-     <th class="py-1 pr-3 nowrap text-right">수익률</th>
-     <th class="py-1 pr-3 nowrap text-right">손익</th>
-     <th class="py-1 pr-3 nowrap">태그</th>
-   </tr></thead><tbody>`];
-
+  const out = [`<div class="card"><h3 class="font-semibold">${dateStr} 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,
+               `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">태그</th></tr></thead><tbody>`];
   for (const t of rows) {
     const pnl = formatPnL(t), r = rate(t);
-    out.push(`
-      <tr class="border-t border-slate-100">
-        <td class="py-1 pr-3 nowrap">
-          <button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button>
-        </td>
-        <td class="py-1 pr-3 nowrap text-right">${
-          r>=0
-            ? `<span class="pnl-pos">${r.toFixed(2)}%</span>`
-            : `<span class="pnl-neg">${r.toFixed(2)}%</span>`
-        }</td>
-        <td class="py-1 pr-3 nowrap text-right">${
-          pnl>=0
-            ? `<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`
-            : `<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`
-        }</td>
-        <td class="py-1 pr-3 nowrap">${t.tags || ''}</td>
-      </tr>
-    `);
+    out.push(`<tr class="border-t border-slate-100">
+      <td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button></td>
+      <td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
+      <td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
+      <td class="py-1 pr-3 nowrap">${t.tags||''}</td></tr>`);
   }
-
   out.push(`</tbody></table></div>`);
-
   const host = document.getElementById('calendarList');
   host.innerHTML = out.join('');
-
-  // 상세보기
-  host.querySelectorAll('.link-symbol').forEach(btn => {
-    btn.addEventListener('click', async () => {
+  host.querySelectorAll('.link-symbol').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
       const id = Number(btn.getAttribute('data-id'));
       const rec = await idbGet(id);
       if (rec) openDetail(rec);
     });
   });
-
-  // ★ 새로 추가: 일자별 메모/이미지 모달 열기
-  document.getElementById('openDayNote')?.addEventListener('click', () => {
-    openNoteModal(dateStr);
-  });
 }
 
 async function renderWeekList(weekStart) {
   const ws = new Date(weekStart);
-  const we = new Date(ws); 
-  we.setDate(we.getDate()+6);
-
+  const we = new Date(ws); we.setDate(we.getDate()+6);
   const sKey = ws.toISOString().slice(0,10);
   const eKey = we.toISOString().slice(0,10);
-
   const all = await idbAll();
-  const rows = all
-      .filter(t => t.date >= sKey && t.date <= eKey)
-      .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
-
+  const rows = all.filter(t => t.date >= sKey && t.date <= eKey)
+                  .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
-
-  const out = [
-`<div class="card">
-  <h3 class="font-semibold">
-    ${sKey} ~ ${eKey} 주간 매매 (합계: ${
-      total>=0 ? `<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`
-               : `<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`
-    })
-  </h3>`,
-
-`<table class="min-w-full text-sm mt-2">
-  <thead class="text-slate-500">
-    <tr>
-      <th class="py-1 pr-3 nowrap">날짜</th>
-      <th class="py-1 pr-3 nowrap">종목</th>
-      <th class="py-1 pr-3 nowrap text-right">수익률</th>
-      <th class="py-1 pr-3 nowrap text-right">손익</th>
-      <th class="py-1 pr-3 nowrap">태그</th>
-    </tr>
-  </thead>
-  <tbody>`
-  ];
-
+  const out = [`<div class="card"><h3 class="font-semibold">${sKey} ~ ${eKey} 주간 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,
+               `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr>
+                 <th class="py-1 pr-3 nowrap">날짜</th><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">수량</th><th class="py-1 pr-3 nowrap">매수가</th><th class="py-1 pr-3 nowrap">매도가</th></tr></thead><tbody>`];
   for (const t of rows) {
-    const pnl = formatPnL(t);
-    const r = rate(t);
-
-    out.push(`
-      <tr class="border-t border-slate-100">
-        <td class="py-1 pr-3 nowrap">${fmtDateNoYear(t.date)}</td>
-        <td class="py-1 pr-3 nowrap">
-          <button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button>
-        </td>
-        <td class="py-1 pr-3 nowrap text-right">
-          ${
-            r>=0
-            ? `<span class="pnl-pos">${r.toFixed(2)}%</span>`
-            : `<span class="pnl-neg">${r.toFixed(2)}%</span>`
-          }
-        </td>
-        <td class="py-1 pr-3 nowrap text-right">
-          ${
-            pnl>=0
-            ? `<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`
-            : `<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`
-          }
-        </td>
-        <td class="py-1 pr-3 nowrap">${t.tags || ''}</td>
-      </tr>
-    `);
+    const pnl = formatPnL(t), r = rate(t);
+    out.push(`<tr class="border-t border-slate-100">
+      <td class="py-1 pr-3 nowrap">${fmtDateNoYear(t.date)}</td>
+      <td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button></td>
+      <td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
+      <td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
+      <td class="py-1 pr-3 nowrap">${t.tags||''}</td></tr>`);
   }
-
   out.push(`</tbody></table></div>`);
-
   const host = document.getElementById('calendarList');
   host.innerHTML = out.join('');
-
-  // 클릭 → 상세 보기
   host.querySelectorAll('.link-symbol').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = Number(btn.getAttribute('data-id'));
@@ -763,42 +667,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   clearForm();
   if (isEditing && lastOpenedDetail) openDetail(lastOpenedDetail);
 });
-// ▣ 모달
-const noteModal = document.getElementById('noteModal');
-const noteClose = document.getElementById('noteClose');
 
-// 닫기
-noteClose.addEventListener('click', () => {
-  noteModal.classList.add('hidden');
-});
-
-// 열기 (renderDayList 안에 openNote 버튼 클릭 핸들러 추가해야 함)
-function openNoteModal() {
-  noteModal.classList.remove('hidden');
-}
-
-// ▣ 이미지 프리뷰
-function setupImgPreview(inputId, imgId) {
-  const input = document.getElementById(inputId);
-  const img = document.getElementById(imgId);
-
-  input.addEventListener('change', () => {
-    const file = input.files[0];
-    if (!file) return;
-    img.src = URL.createObjectURL(file);
-    img.classList.remove('hidden');
-  });
-
-  // 클릭 확대 토글
-  img.addEventListener('click', () => {
-    img.classList.toggle('scale-150');
-    img.classList.toggle('z-50');
-    img.classList.toggle('rounded-xl');
-  });
-}
-
-setupImgPreview('img1', 'imgPrev1');
-setupImgPreview('img2', 'imgPrev2');
 
   $('#deleteTrade').addEventListener('click', async ()=>{
     const id = Number($('#tradeForm').id.value);
@@ -817,5 +686,3 @@ setupImgPreview('img2', 'imgPrev2');
 
 // flag to confirm JS loaded
 window.__APP_OK__ = true;
-
-
