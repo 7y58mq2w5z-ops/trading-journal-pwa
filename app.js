@@ -763,26 +763,6 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   clearForm();
   if (isEditing && lastOpenedDetail) openDetail(lastOpenedDetail);
 });
-
-
-  $('#deleteTrade').addEventListener('click', async ()=>{
-    const id = Number($('#tradeForm').id.value);
-    if (id && confirm('이 거래를 삭제할까요?')) {
-      await idbDelete(id);
-      clearForm();
-      await populateMonthSelect();
-      await renderList();
-      await refreshCalendar();
-      switchTab('list');
-    }
-  });
-
-  await initCalendar();
-})();
-
-// flag to confirm JS loaded
-window.__APP_OK__ = true;
-
 // ▣ 모달
 const noteModal = document.getElementById('noteModal');
 const noteClose = document.getElementById('noteClose');
@@ -819,3 +799,23 @@ function setupImgPreview(inputId, imgId) {
 
 setupImgPreview('img1', 'imgPrev1');
 setupImgPreview('img2', 'imgPrev2');
+
+  $('#deleteTrade').addEventListener('click', async ()=>{
+    const id = Number($('#tradeForm').id.value);
+    if (id && confirm('이 거래를 삭제할까요?')) {
+      await idbDelete(id);
+      clearForm();
+      await populateMonthSelect();
+      await renderList();
+      await refreshCalendar();
+      switchTab('list');
+    }
+  });
+
+  await initCalendar();
+})();
+
+// flag to confirm JS loaded
+window.__APP_OK__ = true;
+
+
