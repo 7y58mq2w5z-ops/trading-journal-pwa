@@ -72,15 +72,45 @@
         </div>
 
         <fieldset class="label">
-          <legend class="mb-1">Tags</legend>
-          <div class="grid grid-cols-3 gap-2 text-sm">
-            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="뇌동"> 뇌동</label>
-            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="급함"> 급함</label>
-            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="큰손실"> 큰손실</label>
-            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="눌림"> 눌림</label>
-            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="돌파"> 돌파</label>
-            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="굿매매"> 굿매매</label>
+          <legend class="mb-1 font-semibold">Tags</legend>
+        
+          <!-- 전략 -->
+          <div class="mb-2">
+            <div class="text-xs text-slate-400 mb-1">전략</div>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+              <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="돌파진입"> 돌파진입</label>
+              <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="눌림진입"> 눌림진입</label>
+            </div>
           </div>
+        
+          <!-- 감정 -->
+          <div class="mb-2">
+            <div class="text-xs text-slate-400 mb-1">감정</div>
+            <div class="grid grid-cols-3 gap-2 text-xs">
+              <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="차분"> 차분</label>
+              <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="조급"> 조급</label>
+              <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="충동"> 충동</label>
+            </div>
+          </div>
+        
+          <!-- 성과 -->
+          <div class="mb-2">
+            <div class="text-xs text-slate-400 mb-1">성과</div>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+              <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="좋은매매"> 좋은매매</label>
+              <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="큰손실"> 큰손실</label>
+            </div>
+          </div>
+        
+          <!-- 리스크 -->
+          <div class="mb-1">
+            <div class="text-xs text-slate-400 mb-1">리스크</div>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+              <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="손절지연"> 손절지연</label>
+              <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="리스크과다"> 리스크과다</label>
+            </div>
+          </div>
+        
         </fieldset>
 
         <textarea name="comment" rows="3" class="input w-full" placeholder=""></textarea>
