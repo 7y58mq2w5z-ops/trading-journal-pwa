@@ -86,10 +86,20 @@
           <!-- 감정 -->
           <div class="mb-2">
             <div class="text-xs text-slate-400 mb-1">감정</div>
-            <div class="grid grid-cols-3 gap-2 text-xs">
-              <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="차분"> 차분</label>
-              <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="조급"> 조급</label>
-              <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="충동"> 충동</label>
+          
+            <!-- 3열 고정 -->
+            <div class="grid grid-cols-3 gap-2 text-sm">
+              <label class="flex items-center gap-1 justify-start">
+                <input type="checkbox" name="tags[]" value="차분"> <span>차분</span>
+              </label>
+          
+              <label class="flex items-center gap-1 justify-center">
+                <input type="checkbox" name="tags[]" value="조급"> <span>조급</span>
+              </label>
+          
+              <label class="flex items-center gap-1 justify-end">
+                <input type="checkbox" name="tags[]" value="충동"> <span>충동</span>
+              </label>
             </div>
           </div>
         
