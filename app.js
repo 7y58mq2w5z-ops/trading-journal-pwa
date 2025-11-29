@@ -1,15 +1,7 @@
 let lastOpenedDetail = null;
 /* Trading Journal - v6.1 (detail '편집' button + edit flow)
- * - Adds an '편집' button **right below** the existing 닫기 button in the detail modal
- * - On click, immediately opens the 입력(폼) 탭 and pre-fills values for editing
- * - No other behaviors changed
+ * + Calendar day note modal (📊), per-date memo/images, highlight, fullscreen images
  */
-
-// ====== EXISTING CODE (from v6) ======
-// (Keep existing helpers/DB/functions as-is; we only add small changes below)
-// NOTE: This file is meant to REPLACE your current app.js entirely.
-// I inlined the minimal portions we need to modify and appended the new logic
-// to your existing openDetail() flow. Everything else remains the same from v6.
 
 // ---------- Tiny IndexedDB helper ----------
 const DB_NAME = 'journal-db';
@@ -87,7 +79,7 @@ function fmtMan(n){
 function monthKeyOf(dateStr){ if (!dateStr || dateStr.length < 7) return ''; return dateStr.slice(0,7); }
 function monthLabel(key){ if (!key) return '전체'; const [y,m] = key.split('-'); return `${y}년 ${String(Number(m))}월`; }
 
-// ---------- Zoom CSS fallback ----------
+// ---------- Zoom CSS fallback (detail modal 이미지용) ----------
 function ensureZoomStyles(){
   if (document.getElementById('zoom-style')) return;
   const css = `.img-zoomed{position:fixed!important;inset:0!important;margin:0!important;background:rgba(0,0,0,.85)!important;object-fit:contain!important;max-width:100vw!important;max-height:100vh!important;width:100vw!important;height:100vh!important;z-index:9999!important;cursor:zoom-out!important}`;
@@ -158,7 +150,7 @@ function clearForm() {
     const span = inp.closest('label')?.querySelector('span.btn-secondary');
     if (span) span.textContent = '파일 선택';
     setFormMode('create');
-});
+  });
 }
 
 // --- Toggle form mode: 'create' | 'edit' ---
@@ -368,50 +360,40 @@ function openDetail(t){
   }
   attachZoomHandler('img1'); attachZoomHandler('img2');
 
-  // ---- NEW: insert '편집' button RIGHT BELOW the existing close button ----
+  // ---- '편집' button below '닫기' ----
   const closeBtn = document.getElementById('detailClose');
-  // Ensure the modal card is relatively positioned so we can align buttons on the top-right stack
   const modalCard = closeBtn?.closest('.modal-card');
   if (modalCard) { modalCard.style.position = 'relative'; }
-  // Create the edit button
   let editBtn = document.getElementById('detailEdit');
-  if (editBtn) editBtn.remove(); // avoid duplicates
+  if (editBtn) editBtn.remove();
   editBtn = document.createElement('button');
   editBtn.id = 'detailEdit';
   editBtn.className = 'btn-secondary';
   editBtn.textContent = '편집';
-  // place it visually "right below" the close button area
   editBtn.style.position = 'absolute';
   editBtn.style.right = '.75rem';
-  editBtn.style.top = '3rem'; // close button is at .75rem; this sits right under it
-  // Make sure it's keyboard-accessible
+  editBtn.style.top = '3rem';
   editBtn.setAttribute('type', 'button');
   closeBtn?.insertAdjacentElement('afterend', editBtn);
 
-  // Edit click -> open form tab & prefill
   editBtn.addEventListener('click', ()=>{
-    // close modal
     modal.classList.remove('show');
-    // switch to form tab
     const formTabBtn = document.querySelector('[data-tab="form"]') || document.querySelector('[data-tab="input"]');
     formTabBtn?.click();
-    // prefill
     fillForm(t);
     setFormMode('edit');
     const formEl = document.getElementById('tradeForm');
     formEl?.scrollIntoView({behavior:'smooth', block:'start'});
-    // (focus removed) formEl?.querySelector('input[name="date"]').focus();
   });
 
-  // Close actions (robust direct bindings so it works after returning from edit)
   function closeDetail(){ modal.classList.remove('show'); }
   const closeBtnEl = document.getElementById('detailClose');
   if (closeBtnEl) {
     closeBtnEl.onclick = (e)=>{ e.preventDefault(); e.stopPropagation(); closeDetail(); };
   }
   modal.onclick = (e)=>{ if (e.target === modal) closeDetail(); };
-
 }
+
 // ---------- Calendar ----------
 let calendar;
 
@@ -469,11 +451,16 @@ async function initCalendar() {
       if (d === 0) { arg.el.style.color = '#dc2626'; }
       if (d === 6) { arg.el.style.color = '#2563eb'; }
     },
-    dateClick: async (info) => { renderCalendarList(info.dateStr); },
+    dateClick: async (info) => { 
+      await renderCalendarList(info.dateStr); 
+    },
     eventClick: async (info) => {
       const ep = info.event.extendedProps || {};
-      if (ep.kind === 'daily' && ep.dateStr) renderCalendarList(ep.dateStr);
-      else if (ep.kind === 'weekly' && ep.weekStart) renderWeekList(ep.weekStart);
+      if (ep.kind === 'daily' && ep.dateStr) {
+        await renderCalendarList(ep.dateStr);
+      } else if (ep.kind === 'weekly' && ep.weekStart) {
+        await renderWeekList(ep.weekStart);
+      }
     }
   });
   calendar.render();
@@ -487,11 +474,168 @@ async function refreshCalendar() {
   calendar.addEventSource(events);
 }
 
+// ---------- Day note modal & calendar selection ----------
+let currentNoteDate = null;
+
+// cache modal DOM (index.html에 이미 있음)
+const noteModal = document.getElementById('noteModal');
+const noteClose = document.getElementById('noteClose');
+const noteTextEl = document.getElementById('noteText');
+const noteDateLabelEl = document.getElementById('noteDateLabel');
+const noteImg1Btn = document.getElementById('noteImg1Btn');
+const noteImg2Btn = document.getElementById('noteImg2Btn');
+const noteImg1Input = document.getElementById('noteImg1Input');
+const noteImg2Input = document.getElementById('noteImg2Input');
+const noteImg1Preview = document.getElementById('noteImg1Preview');
+const noteImg2Preview = document.getElementById('noteImg2Preview');
+const imgFullscreen = document.getElementById('imgFullscreen');
+const imgFullscreenImg = document.getElementById('imgFullscreenImg');
+
+function highlightCalendarDate(dateStr) {
+  const cells = document.querySelectorAll('.fc-daygrid-day');
+  cells.forEach(el => {
+    if (dateStr && el.dataset.date === dateStr) el.classList.add('cal-selected-day');
+    else el.classList.remove('cal-selected-day');
+  });
+}
+
+function safeLocalGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function safeLocalSet(key, val) {
+  try { localStorage.setItem(key, val); } catch {}
+}
+
+function loadNoteForDate(dateStr) {
+  currentNoteDate = dateStr;
+  if (noteDateLabelEl) {
+    noteDateLabelEl.textContent = `${dateStr} 메모 및 이미지`;
+  }
+  if (noteTextEl) {
+    noteTextEl.value = safeLocalGet('note:' + dateStr) || '';
+  }
+  if (noteImg1Preview) {
+    const img1 = safeLocalGet('noteImg1:' + dateStr);
+    if (img1) {
+      noteImg1Preview.src = img1;
+      noteImg1Preview.classList.remove('hidden');
+    } else {
+      noteImg1Preview.src = '';
+      noteImg1Preview.classList.add('hidden');
+    }
+  }
+  if (noteImg2Preview) {
+    const img2 = safeLocalGet('noteImg2:' + dateStr);
+    if (img2) {
+      noteImg2Preview.src = img2;
+      noteImg2Preview.classList.remove('hidden');
+    } else {
+      noteImg2Preview.src = '';
+      noteImg2Preview.classList.add('hidden');
+    }
+  }
+}
+
+function openNoteModal(dateStr) {
+  if (!noteModal) return;
+  loadNoteForDate(dateStr);
+  noteModal.classList.remove('hidden');
+}
+
+function closeNoteModal() {
+  if (!noteModal) return;
+  noteModal.classList.add('hidden');
+}
+
+function openFullscreenImage(src) {
+  if (!imgFullscreen || !imgFullscreenImg || !src) return;
+  imgFullscreenImg.src = src;
+  imgFullscreen.classList.remove('hidden');
+}
+
+function setupNoteModalEvents() {
+  if (!noteModal) return;
+
+  if (noteClose) {
+    noteClose.addEventListener('click', () => {
+      closeNoteModal();
+    });
+  }
+
+  if (noteImg1Btn && noteImg1Input) {
+    noteImg1Btn.addEventListener('click', () => noteImg1Input.click());
+  }
+  if (noteImg2Btn && noteImg2Input) {
+    noteImg2Btn.addEventListener('click', () => noteImg2Input.click());
+  }
+
+  if (noteTextEl) {
+    noteTextEl.addEventListener('input', () => {
+      if (!currentNoteDate) return;
+      safeLocalSet('note:' + currentNoteDate, noteTextEl.value);
+    });
+  }
+
+  if (noteImg1Input && noteImg1Preview) {
+    noteImg1Input.addEventListener('change', async () => {
+      const file = noteImg1Input.files && noteImg1Input.files[0];
+      if (!file || !currentNoteDate) return;
+      const dataUrl = await compressFileToDataURL(file, {maxSide:2000, quality:0.85});
+      if (!dataUrl) return;
+      noteImg1Preview.src = dataUrl;
+      noteImg1Preview.classList.remove('hidden');
+      safeLocalSet('noteImg1:' + currentNoteDate, dataUrl);
+    });
+    noteImg1Preview.addEventListener('click', () => {
+      if (!noteImg1Preview.classList.contains('hidden')) openFullscreenImage(noteImg1Preview.src);
+    });
+  }
+
+  if (noteImg2Input && noteImg2Preview) {
+    noteImg2Input.addEventListener('change', async () => {
+      const file = noteImg2Input.files && noteImg2Input.files[0];
+      if (!file || !currentNoteDate) return;
+      const dataUrl = await compressFileToDataURL(file, {maxSide:2000, quality:0.85});
+      if (!dataUrl) return;
+      noteImg2Preview.src = dataUrl;
+      noteImg2Preview.classList.remove('hidden');
+      safeLocalSet('noteImg2:' + currentNoteDate, dataUrl);
+    });
+    noteImg2Preview.addEventListener('click', () => {
+      if (!noteImg2Preview.classList.contains('hidden')) openFullscreenImage(noteImg2Preview.src);
+    });
+  }
+
+  if (imgFullscreen) {
+    imgFullscreen.addEventListener('click', () => {
+      imgFullscreen.classList.add('hidden');
+      if (imgFullscreenImg) imgFullscreenImg.src = '';
+    });
+  }
+}
+
+// ---------- Calendar list render (일별/주간) ----------
 async function renderCalendarList(dateStr) {
   const all = await idbAll();
-  const rows = all.filter(t => t.date === dateStr).sort((a,b)=> (a.created_at||'').localeCompare(b.created_at||''));
+  const rows = all.filter(t => t.date === dateStr)
+                  .sort((a,b)=> (a.created_at||'').localeCompare(b.created_at||''));
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
-  const out = [`<div class="card"><h3 class="font-semibold">${dateStr} 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`,
+
+  const headerHtml = `
+    <div class="card">
+      <h3 class="font-semibold flex justify-between items-center">
+        <span>${dateStr} 매매 (합계: ${
+          total>=0
+            ? `<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`
+            : `<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`
+        })</span>
+        <button type="button" class="p-1 rounded hover:bg-slate-100" id="dayNoteBtn" title="일자 메모/이미지">
+          📊
+        </button>
+      </h3>
+  `;
+
+  const out = [headerHtml,
                `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">태그</th></tr></thead><tbody>`];
   for (const t of rows) {
     const pnl = formatPnL(t), r = rate(t);
@@ -504,6 +648,11 @@ async function renderCalendarList(dateStr) {
   out.push(`</tbody></table></div>`);
   const host = document.getElementById('calendarList');
   host.innerHTML = out.join('');
+
+  // 날짜 선택 음영
+  highlightCalendarDate(dateStr);
+
+  // 상세보기
   host.querySelectorAll('.link-symbol').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = Number(btn.getAttribute('data-id'));
@@ -511,6 +660,12 @@ async function renderCalendarList(dateStr) {
       if (rec) openDetail(rec);
     });
   });
+
+  // 📊 버튼 → 메모/이미지 모달
+  const noteBtn = document.getElementById('dayNoteBtn');
+  if (noteBtn) {
+    noteBtn.addEventListener('click', () => openNoteModal(dateStr));
+  }
 }
 
 async function renderWeekList(weekStart) {
@@ -584,7 +739,6 @@ async function renderWeekList(weekStart) {
   const host = document.getElementById('calendarList');
   host.innerHTML = out.join('');
 
-  // 클릭 → 상세 보기
   host.querySelectorAll('.link-symbol').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = Number(btn.getAttribute('data-id'));
@@ -592,7 +746,11 @@ async function renderWeekList(weekStart) {
       if (rec) openDetail(rec);
     });
   });
+
+  // 주간합계 클릭 시는 특정 날짜 음영 없음
+  highlightCalendarDate(null);
 }
+
 // ---------- Tab logic ----------
 function switchTab(name) {
   $$('.card').forEach(sec=>sec.classList.add('hidden'));
@@ -698,9 +856,14 @@ window.addEventListener('beforeinstallprompt', (e)=>{
       image2: img2,
       created_at: prev ? prev.created_at : new Date().toISOString()
     };
-    if (payload.id) { await idbPut(payload); alert('수정 완료');
-    openDetail(payload);
-  } else { await idbAdd(payload); alert('저장 완료'); }
+    if (payload.id) {
+      await idbPut(payload);
+      alert('수정 완료');
+      openDetail(payload);
+    } else {
+      await idbAdd(payload);
+      alert('저장 완료');
+    }
     clearForm();
     await populateMonthSelect();
     await renderList();
@@ -709,12 +872,11 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   });
 
   (document.getElementById('cancelBtn') || document.getElementById('resetForm'))?.addEventListener('click', () => {
-  const form = document.getElementById('tradeForm');
-  const isEditing = !!(form && form.id && form.id.value);
-  clearForm();
-  if (isEditing && lastOpenedDetail) openDetail(lastOpenedDetail);
-});
-
+    const form = document.getElementById('tradeForm');
+    const isEditing = !!(form && form.id && form.id.value);
+    clearForm();
+    if (isEditing && lastOpenedDetail) openDetail(lastOpenedDetail);
+  });
 
   $('#deleteTrade').addEventListener('click', async ()=>{
     const id = Number($('#tradeForm').id.value);
@@ -729,6 +891,9 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   });
 
   await initCalendar();
+
+  // 메모 모달/전체화면 초기화
+  setupNoteModalEvents();
 })();
 
 // flag to confirm JS loaded
