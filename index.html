@@ -30,11 +30,11 @@
     .btn-secondary { border:1px solid #e5e7eb; border-radius:.5rem; padding:.5rem .75rem; background:#f8fafc; }
     .btn-save { background:#10b981; color:#fff; border-radius:.5rem; padding:.5rem .75rem; }
     .btn-new, #cancelBtn {
-  background: #374151 !important; /* slate-700 */
-  color: #fff !important;
-  border-radius: .5rem;
-  padding: .5rem .75rem;
-}
+      background: #374151 !important; /* slate-700 */
+      color: #fff !important;
+      border-radius: .5rem;
+      padding: .5rem .75rem;
+    }
     .btn-danger { background:#ef4444; color:#fff; border-radius:.5rem; padding:.5rem .75rem; }
     .pnl-pos { color:#dc2626; font-weight:600; }
     .pnl-neg { color:#2563eb; font-weight:600; }
@@ -42,6 +42,20 @@
     .detail-img { border-radius:.75rem; box-shadow: 0 2px 8px rgba(0,0,0,.08); max-height:60vh; width:100%; object-fit:contain; cursor: zoom-in; }
     .detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap: .75rem; }
     .detail-images { grid-column: 1 / -1; display:flex; gap:.75rem; }
+
+    /* 선택된 캘린더 날짜 강조용 (JS에서 클래스만 붙여주면 됨) */
+    .cal-selected-day {
+      background-color: rgba(59,130,246,0.16) !important; /* blue-500/15 */
+      border-radius: 0.5rem;
+    }
+
+    /* 전체 화면 이미지 뷰어용 */
+    #imgFullscreen {
+      display: none;
+    }
+    #imgFullscreen.show {
+      display: flex;
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
@@ -176,6 +190,40 @@
         <div id="detailContent"></div>
       </div>
     </div>
+
+    <!-- 일자별 메모/이미지 모달 -->
+    <div id="noteModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+      <div class="bg-white p-4 rounded-xl w-full max-w-lg relative">
+        <button id="noteClose" class="absolute right-3 top-2 text-slate-500 text-xl">&times;</button>
+        <h3 class="text-lg font-semibold mb-3">
+          <span id="noteDateLabel">일자 메모 및 이미지</span>
+        </h3>
+
+        <!-- 메모 -->
+        <textarea id="noteText" class="w-full border rounded p-2 mb-3" rows="4"
+                  placeholder="오늘 일기 / 지수 흐름 등을 기록하세요"></textarea>
+
+        <!-- 이미지 2개 나란히 -->
+        <div class="flex gap-2">
+          <div class="w-1/2">
+            <button id="noteImg1Btn" class="btn-secondary w-full mb-1">이미지 1 선택</button>
+            <input type="file" id="noteImg1Input" accept="image/*" class="hidden">
+            <img id="noteImg1Preview" class="w-full rounded cursor-pointer hidden">
+          </div>
+          <div class="w-1/2">
+            <button id="noteImg2Btn" class="btn-secondary w-full mb-1">이미지 2 선택</button>
+            <input type="file" id="noteImg2Input" accept="image/*" class="hidden">
+            <img id="noteImg2Preview" class="w-full rounded cursor-pointer hidden">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 전체 화면 이미지 뷰어 -->
+    <div id="imgFullscreen" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[60]">
+      <img id="imgFullscreenImg" class="max-w-full max-h-full">
+    </div>
+
   </div>
 
   <!-- JS 로드 -->
