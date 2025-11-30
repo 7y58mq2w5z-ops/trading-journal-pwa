@@ -409,7 +409,10 @@ function recomputeCalendarEvents(all) {
       title: fmtMan(Math.round(val)),
       start: d,
       allDay: true,
-      color: val >= 0 ? '#dc2626' : '#2563eb',
+      backgroundColor: 'transparent',
+      borderColor: 'transparent',
+      textColor: val >= 0 ? '#dc2626' : '#2563eb',
+      display: 'block',
       extendedProps: { kind: 'daily', dateStr: d }
     });
   }
@@ -432,7 +435,10 @@ function recomputeCalendarEvents(all) {
         title: fmtMan(Math.round(sum)),
         start: saturday.toISOString().slice(0,10),
         allDay: true,
-        color: '#111827',
+        backgroundColor: sum >= 0 ? '#dc2626' : '#2563eb',
+        borderColor: sum >= 0 ? '#dc2626' : '#2563eb',
+        textColor: '#fff',
+        display: 'block',
         extendedProps: { kind: 'weekly', weekStart: keyStart }
       });
     }
