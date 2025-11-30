@@ -409,10 +409,7 @@ function recomputeCalendarEvents(all) {
       title: fmtMan(Math.round(val)),
       start: d,
       allDay: true,
-      backgroundColor: 'transparent',
-      borderColor: 'transparent',
-      textColor: val >= 0 ? '#dc2626' : '#2563eb',
-      display: 'block',
+      color: val >= 0 ? '#dc2626' : '#2563eb',
       extendedProps: { kind: 'daily', dateStr: d }
     });
   }
@@ -435,10 +432,7 @@ function recomputeCalendarEvents(all) {
         title: fmtMan(Math.round(sum)),
         start: saturday.toISOString().slice(0,10),
         allDay: true,
-        backgroundColor: sum >= 0 ? '#dc2626' : '#2563eb',
-        borderColor: sum >= 0 ? '#dc2626' : '#2563eb',
-        textColor: '#fff',
-        display: 'block',
+        color: '#111827',   // 검정색 음영
         extendedProps: { kind: 'weekly', weekStart: keyStart }
       });
     }
