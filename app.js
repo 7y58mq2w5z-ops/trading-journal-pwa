@@ -326,11 +326,11 @@ async function renderList() {
   const table = [`<table class="min-w-full table-fixed text-xs">
     <thead class="text-slate-500">
       <tr>
-        <th class="py-1 pr-2 w-14 text-left">날짜</th>
-        <th class="py-1 pr-2 text-left">종목</th>
-        <th class="py-1 pr-2 w-16 text-right">수익률</th>
-        <th class="py-1 pr-2 w-20 text-right">손익</th>
-        <th class="py-1 pr-2 w-14 text-right">조회</th>
+        <th class="py-1 pr-2 w-16 text-left whitespace-nowrap">날짜</th>
+        <th class="py-1 pr-2 text-left whitespace-nowrap">종목</th>
+        <th class="py-1 pr-2 w-16 text-right whitespace-nowrap">수익률</th>
+        <th class="py-1 pr-2 w-20 text-right whitespace-nowrap">손익</th>
+        <th class="py-1 pr-2 w-14 text-right whitespace-nowrap">조회</th>
       </tr>
     </thead>
     <tbody>`];
@@ -360,12 +360,12 @@ async function renderList() {
 
     const views = Number(t.views || 0);
 
-    table.push(`<tr class="border-t border-slate-200 hover:bg-slate-200 cursor-pointer ${rowBg}" data-id="${t.id}">
-      <td class="py-1 pr-2">${dateCell}</td>
+    table.push(`<tr class="border-t border-slate-200 cursor-pointer ${rowBg}" data-id="${t.id}">
+      <td class="py-1 pr-2 whitespace-nowrap">${dateCell}</td>
       <td class="py-1 pr-2 truncate">${symbolHtml}</td>
-      <td class="py-1 pr-2 text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
-      <td class="py-1 pr-2 text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
-      <td class="py-1 pr-2 text-right text-slate-600">${fmtNumber(views)}</td>
+      <td class="py-1 pr-2 text-right whitespace-nowrap">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
+      <td class="py-1 pr-2 text-right whitespace-nowrap">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
+      <td class="py-1 pr-2 text-right text-slate-600 whitespace-nowrap">${fmtNumber(views)}</td>
     </tr>`);
   }
 
