@@ -428,6 +428,10 @@ function openDetail(t){
         <div class="text-slate-500 text-sm">매수금액</div>
         <div class="font-medium">${fmtNumber(Math.round(buyAmount))}</div>
       </div>
+      <div>
+        <div class="text-slate-500 text-sm">태그</div>
+        <div class="font-medium whitespace-pre-wrap">${t.tags || ''}</div>
+      </div>
       <div style="grid-column: 1 / -1;">
         <div class="text-slate-500 text-sm">코멘트</div>
         <div class="mt-1 p-2 rounded border border-slate-200 bg-slate-50 whitespace-pre-wrap">${t.comment||''}</div>
