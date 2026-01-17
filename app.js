@@ -434,9 +434,9 @@ function openDetail(t){
       </div>
       <div style="grid-column: 1 / -1;">
         <div class="text-slate-500 text-sm">코멘트</div>
-        <div class="mt-1 p-2 rounded border border-slate-200 bg-slate-50 whitespace-pre-wrap break-words">
-          ${(t.comment || '').replace(/^\s+/, '')}
-        </div>
+        <div id="detailComment"
+             class="mt-1 p-2 rounded border border-slate-200 bg-slate-50
+                    whitespace-pre overflow-x-auto text-xs leading-relaxed"></div>
       </div>
       <div class="detail-images" style="display:flex;gap:.75rem;">
         ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
@@ -445,6 +445,8 @@ function openDetail(t){
     </div>`;
 
   $('#detailContent').innerHTML = html;
+  const c = document.getElementById('detailComment');
+  if (c) c.textContent = t.comment || '';
   const modal = $('#detailModal');
   modal.classList.add('show');
 
