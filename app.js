@@ -1,6 +1,14 @@
 let lastOpenedDetail = null;
 /* Trading Journal - v6.1 (detail '편집' button + edit flow)
  * + Calendar day note modal (📊), per-date memo/images, highlight, fullscreen images
+ *
+ * v6.2 (requested):
+ * 1) Fee/Tax auto included in PnL: (buyAmount + sellAmount) * 0.23%
+ * 2) List grouped by day with alternating background + show distinct symbol count per day
+ * 3) Add "highlight" checkbox support -> show marker next to symbol in list
+ * 4) View count increments on every open from list/calendar and shown in list column
+ * 5) Hide tags column from list (search still matches tags)
+ * 6) List header order: 날짜, 종목, 수익률, 손익, 조회
  */
 
 // ---------- Tiny IndexedDB helper ----------
@@ -60,7 +68,28 @@ function idbAll() { return new Promise((resolve, reject) => {
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-function formatPnL(t) { return (Number(t.sell_price||0) - Number(t.buy_price||0)) * Number(t.qty||0); }
+const FEE_RATE = 0.0023; // 0.23% fixed (buy+sell)
+
+function calcBuyAmount(t){ return Number(t.buy_price||0) * Number(t.qty||0); }
+function calcSellAmount(t){ return Number(t.sell_price||0) * Number(t.qty||0); }
+function calcFeeTax(t){
+  const buyAmount = calcBuyAmount(t);
+  const sellAmount = calcSellAmount(t);
+  return (buyAmount + sellAmount) * FEE_RATE;
+}
+
+// (1) PnL now includes fee/tax
+function formatPnL(t) {
+  const qty = Number(t.qty || 0);
+  const buyPrice = Number(t.buy_price || 0);
+  const sellPrice = Number(t.sell_price || 0);
+
+  const grossPnL = (sellPrice - buyPrice) * qty;
+  const feeAndTax = calcFeeTax(t);
+
+  return grossPnL - feeAndTax;
+}
+
 function rate(t) { if (!t.buy_price) return 0; return ((Number(t.sell_price||0) / Number(t.buy_price||0)) - 1) * 100; }
 
 function fmtDateNoYear(s){ if(!s) return ''; return s.slice(5); } // YYYY-MM-DD -> MM-DD
@@ -142,15 +171,19 @@ async function compressFileToDataURL(file, {maxSide=2000, quality=0.85} = {}){
 // ---------- Form helpers ----------
 function clearForm() {
   const form = $('#tradeForm');
+  if (!form) return;
   form.reset();
   form.id.value = '';
   document.querySelectorAll('input[name="tags[]"]').forEach(ch => ch.checked = false);
+  if (form.highlight) form.highlight.checked = false;
+
   $('#deleteTrade').classList.add('hidden');
   form.querySelectorAll('input[type="file"]').forEach((inp)=>{
     const span = inp.closest('label')?.querySelector('span.btn-secondary');
     if (span) span.textContent = '파일 선택';
-    setFormMode('create');
   });
+
+  setFormMode('create');
 }
 
 // --- Toggle form mode: 'create' | 'edit' ---
@@ -181,6 +214,8 @@ function fillForm(t) {
   form.buy_price.value = t.buy_price ?? '';
   form.sell_price.value = t.sell_price ?? '';
   form.comment.value = t.comment || '';
+  if (form.highlight) form.highlight.checked = !!t.highlight;
+
   document.querySelectorAll('input[name="tags[]"]').forEach(ch => { ch.checked = false; });
   if (t.tags) {
     const set = new Set(String(t.tags).split(',').map(s=>s.trim()).filter(Boolean));
@@ -232,16 +267,32 @@ async function populateMonthSelect() {
   if (sort) sort.style.width = '7.5rem';
 }
 
+// ---------- View counter helper ----------
+async function incrementViews(id) {
+  const rec = await idbGet(id);
+  if (!rec) return null;
+  rec.views = Number(rec.views || 0) + 1;
+  await idbPut(rec);
+  return rec;
+}
+async function openDetailWithViewCount(id){
+  const rec = await incrementViews(id);
+  if (!rec) return;
+  openDetail(rec);
+  await renderList();
+}
+
 // ---------- List render ----------
 let chart;
 async function renderList() {
-  const q = $('#searchInput').value.trim().toLowerCase();
-  const sortKey = $('#sortSelect').value;
+  const q = $('#searchInput')?.value?.trim().toLowerCase() || '';
+  const sortKey = $('#sortSelect')?.value || 'date_desc';
   const monthKey = $('#monthSelect') ? $('#monthSelect').value : 'all';
 
   const data = await idbAll();
+
   let rows = data.filter(t => {
-    const tagStr = (t.tags || '').toLowerCase();
+    const tagStr = (t.tags || '').toLowerCase(); // tags hidden from UI but searchable
     const sym = (t.symbol || '').toLowerCase();
     const okQuery = !q || tagStr.includes(q) || sym.includes(q);
     const okMonth = monthKey === 'all' || monthKeyOf(t.date) === monthKey;
@@ -256,23 +307,59 @@ async function renderList() {
     return 0;
   });
 
+  // (2) distinct symbol count per day (within filtered rows)
+  const daySymbolMap = new Map(); // date -> Set(symbol)
+  for (const t of rows) {
+    const d = t.date || '';
+    if (!d) continue;
+    if (!daySymbolMap.has(d)) daySymbolMap.set(d, new Set());
+    daySymbolMap.get(d).add((t.symbol || '').trim());
+  }
+
+  // (5) Hide tags column from list
+  // (4) Add views column
+  // (6) Header order: 날짜, 종목, 수익률, 손익, 조회
   const table = [`<table class="min-w-full text-sm"><thead class="text-slate-500"><tr>
     <th class="py-2 pr-3 nowrap">날짜</th>
     <th class="py-2 pr-3 nowrap">종목</th>
     <th class="py-2 pr-3 nowrap text-right">수익률</th>
     <th class="py-2 pr-3 nowrap text-right">손익</th>
-    <th class="py-2 pr-3 nowrap">태그</th>
+    <th class="py-2 pr-3 nowrap text-right">조회</th>
   </tr></thead><tbody>`];
+
+  // (2) alternate bg by day
+  let lastDate = null;
+  let alt = false; // false white, true light gray
 
   for (const t of rows) {
     const pnl = formatPnL(t);
     const r = rate(t);
-    table.push(`<tr class="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" data-id="${t.id}">
-      <td class="py-1 pr-3 nowrap">${fmtDateNoYear(t.date)}</td>
-      <td class="py-1 pr-3 nowrap">${t.symbol||''}</td>
+
+    const d = t.date || '';
+    if (d !== lastDate) { alt = !alt; lastDate = d; }
+    const rowBg = alt ? 'bg-slate-50' : 'bg-white';
+
+    // (2) show distinct symbols count in date cell
+    const symCount = d && daySymbolMap.get(d) ? daySymbolMap.get(d).size : 0;
+    const dateCell = d
+      ? `${fmtDateNoYear(d)} <span class="text-slate-400">(${symCount})</span>`
+      : '';
+
+    // (3) highlight marker next to symbol
+    const symbolHtml = (t.highlight)
+      ? `<span class="inline-flex items-center gap-1 font-semibold">
+           <span class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>${t.symbol||''}
+         </span>`
+      : (t.symbol||'');
+
+    const views = Number(t.views || 0);
+
+    table.push(`<tr class="border-t border-slate-100 hover:bg-slate-100 cursor-pointer ${rowBg}" data-id="${t.id}">
+      <td class="py-1 pr-3 nowrap">${dateCell}</td>
+      <td class="py-1 pr-3 nowrap">${symbolHtml}</td>
       <td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
       <td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
-      <td class="py-1 pr-3 nowrap">${t.tags||''}</td>
+      <td class="py-1 pr-3 nowrap text-right text-slate-500">${fmtNumber(views)}</td>
     </tr>`);
   }
   table.push(`</tbody></table>`);
@@ -281,8 +368,7 @@ async function renderList() {
   $('#listContainer').querySelectorAll('tr[data-id]').forEach(tr=>{
     tr.addEventListener('click', async ()=>{
       const id = Number(tr.getAttribute('data-id'));
-      const rec = await idbGet(id);
-      if (rec) openDetail(rec);
+      await openDetailWithViewCount(id);
     });
   });
 
@@ -295,11 +381,13 @@ async function renderList() {
 
   if (chart) chart.destroy();
   const ctx = document.getElementById('pnlChart');
-  chart = new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets: [{ label: '일별 손익 합계', data: values }] },
-    options: { responsive: true, maintainAspectRatio: false }
-  });
+  if (ctx) {
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: '일별 손익 합계', data: values }] },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  }
 }
 
 // ---------- Detail Modal ----------
@@ -307,7 +395,11 @@ function openDetail(t){
   lastOpenedDetail = t;
   const pnl = formatPnL(t);
   const r = rate(t);
-  const buyAmount = (Number(t.buy_price||0) * Number(t.qty||0));
+
+  const buyAmount = calcBuyAmount(t);
+  const sellAmount = calcSellAmount(t);
+  const feeAndTax = Math.round((buyAmount + sellAmount) * FEE_RATE);
+
   const html = `
     <div class="detail-grid">
       <div>
@@ -319,11 +411,15 @@ function openDetail(t){
         <div class="font-medium">${t.symbol||''}</div>
       </div>
       <div>
+        <div class="text-slate-500 text-sm">조회수</div>
+        <div class="font-medium">${fmtNumber(t.views||0)}</div>
+      </div>
+      <div>
         <div class="text-slate-500 text-sm">수익률</div>
         <div class="font-semibold">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</div>
       </div>
       <div>
-        <div class="text-slate-500 text-sm">수익금</div>
+        <div class="text-slate-500 text-sm">손익(수수료·세금 반영)</div>
         <div class="font-semibold">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</div>
       </div>
       <div>
@@ -331,8 +427,12 @@ function openDetail(t){
         <div class="font-medium">${fmtNumber(Math.round(buyAmount))}</div>
       </div>
       <div>
-        <div class="text-slate-500 text-sm">Tags</div>
-        <div class="font-medium">${t.tags||''}</div>
+        <div class="text-slate-500 text-sm">매도금액</div>
+        <div class="font-medium">${fmtNumber(Math.round(sellAmount))}</div>
+      </div>
+      <div>
+        <div class="text-slate-500 text-sm">수수료·세금(0.23%)</div>
+        <div class="font-medium">-${fmtNumber(feeAndTax)}</div>
       </div>
       <div style="grid-column: 1 / -1;">
         <div class="text-slate-500 text-sm">코멘트</div>
@@ -432,7 +532,7 @@ function recomputeCalendarEvents(all) {
         title: fmtMan(Math.round(sum)),
         start: saturday.toISOString().slice(0,10),
         allDay: true,
-        color: '#111827',   // 검정색 음영
+        color: '#111827',
         extendedProps: { kind: 'weekly', weekStart: keyStart }
       });
     }
@@ -451,16 +551,11 @@ async function initCalendar() {
       if (d === 0) { arg.el.style.color = '#dc2626'; }
       if (d === 6) { arg.el.style.color = '#2563eb'; }
     },
-    dateClick: async (info) => { 
-      await renderCalendarList(info.dateStr); 
-    },
+    dateClick: async (info) => { await renderCalendarList(info.dateStr); },
     eventClick: async (info) => {
       const ep = info.event.extendedProps || {};
-      if (ep.kind === 'daily' && ep.dateStr) {
-        await renderCalendarList(ep.dateStr);
-      } else if (ep.kind === 'weekly' && ep.weekStart) {
-        await renderWeekList(ep.weekStart);
-      }
+      if (ep.kind === 'daily' && ep.dateStr) await renderCalendarList(ep.dateStr);
+      else if (ep.kind === 'weekly' && ep.weekStart) await renderWeekList(ep.weekStart);
     }
   });
   calendar.render();
@@ -477,7 +572,6 @@ async function refreshCalendar() {
 // ---------- Day note modal & calendar selection ----------
 let currentNoteDate = null;
 
-// cache modal DOM (index.html에 이미 있음)
 const noteModal = document.getElementById('noteModal');
 const noteClose = document.getElementById('noteClose');
 const noteTextEl = document.getElementById('noteText');
@@ -499,53 +593,28 @@ function highlightCalendarDate(dateStr) {
   });
 }
 
-function safeLocalGet(key) {
-  try { return localStorage.getItem(key); } catch { return null; }
-}
-function safeLocalSet(key, val) {
-  try { localStorage.setItem(key, val); } catch {}
-}
+function safeLocalGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function safeLocalSet(key, val) { try { localStorage.setItem(key, val); } catch {} }
 
 function loadNoteForDate(dateStr) {
   currentNoteDate = dateStr;
-  if (noteDateLabelEl) {
-    noteDateLabelEl.textContent = `${dateStr} 메모 및 이미지`;
-  }
-  if (noteTextEl) {
-    noteTextEl.value = safeLocalGet('note:' + dateStr) || '';
-  }
+  if (noteDateLabelEl) noteDateLabelEl.textContent = `${dateStr} 메모 및 이미지`;
+  if (noteTextEl) noteTextEl.value = safeLocalGet('note:' + dateStr) || '';
+
   if (noteImg1Preview) {
     const img1 = safeLocalGet('noteImg1:' + dateStr);
-    if (img1) {
-      noteImg1Preview.src = img1;
-      noteImg1Preview.classList.remove('hidden');
-    } else {
-      noteImg1Preview.src = '';
-      noteImg1Preview.classList.add('hidden');
-    }
+    if (img1) { noteImg1Preview.src = img1; noteImg1Preview.classList.remove('hidden'); }
+    else { noteImg1Preview.src = ''; noteImg1Preview.classList.add('hidden'); }
   }
   if (noteImg2Preview) {
     const img2 = safeLocalGet('noteImg2:' + dateStr);
-    if (img2) {
-      noteImg2Preview.src = img2;
-      noteImg2Preview.classList.remove('hidden');
-    } else {
-      noteImg2Preview.src = '';
-      noteImg2Preview.classList.add('hidden');
-    }
+    if (img2) { noteImg2Preview.src = img2; noteImg2Preview.classList.remove('hidden'); }
+    else { noteImg2Preview.src = ''; noteImg2Preview.classList.add('hidden'); }
   }
 }
 
-function openNoteModal(dateStr) {
-  if (!noteModal) return;
-  loadNoteForDate(dateStr);
-  noteModal.classList.remove('hidden');
-}
-
-function closeNoteModal() {
-  if (!noteModal) return;
-  noteModal.classList.add('hidden');
-}
+function openNoteModal(dateStr) { if (!noteModal) return; loadNoteForDate(dateStr); noteModal.classList.remove('hidden'); }
+function closeNoteModal() { if (!noteModal) return; noteModal.classList.add('hidden'); }
 
 function openFullscreenImage(src) {
   if (!imgFullscreen || !imgFullscreenImg || !src) return;
@@ -556,18 +625,10 @@ function openFullscreenImage(src) {
 function setupNoteModalEvents() {
   if (!noteModal) return;
 
-  if (noteClose) {
-    noteClose.addEventListener('click', () => {
-      closeNoteModal();
-    });
-  }
+  if (noteClose) noteClose.addEventListener('click', closeNoteModal);
 
-  if (noteImg1Btn && noteImg1Input) {
-    noteImg1Btn.addEventListener('click', () => noteImg1Input.click());
-  }
-  if (noteImg2Btn && noteImg2Input) {
-    noteImg2Btn.addEventListener('click', () => noteImg2Input.click());
-  }
+  if (noteImg1Btn && noteImg1Input) noteImg1Btn.addEventListener('click', () => noteImg1Input.click());
+  if (noteImg2Btn && noteImg2Input) noteImg2Btn.addEventListener('click', () => noteImg2Input.click());
 
   if (noteTextEl) {
     noteTextEl.addEventListener('input', () => {
@@ -617,26 +678,29 @@ function setupNoteModalEvents() {
 // ---------- Calendar list render (일별/주간) ----------
 async function renderCalendarList(dateStr) {
   const all = await idbAll();
-  const rows = all.filter(t => t.date === dateStr)
-                  .sort((a,b)=> (a.created_at||'').localeCompare(b.created_at||''));
+  const rows = all.filter(t => t.date === dateStr).sort((a,b)=> (a.created_at||'').localeCompare(b.created_at||''));
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
 
   const headerHtml = `
     <div class="card">
       <h3 class="font-semibold flex justify-between items-center">
         <span>${dateStr} 매매 (합계: ${
-          total>=0
-            ? `<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`
-            : `<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`
+          total>=0 ? `<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`
+                   : `<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`
         })</span>
-        <button type="button" class="p-1 rounded hover:bg-slate-100" id="dayNoteBtn" title="일자 메모/이미지">
-          📊
-        </button>
+        <button type="button" class="p-1 rounded hover:bg-slate-100" id="dayNoteBtn" title="일자 메모/이미지">📊</button>
       </h3>
   `;
 
   const out = [headerHtml,
-               `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">태그</th></tr></thead><tbody>`];
+    `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr>
+      <th class="py-1 pr-3 nowrap">종목</th>
+      <th class="py-1 pr-3 nowrap text-right">수익률</th>
+      <th class="py-1 pr-3 nowrap text-right">손익</th>
+      <th class="py-1 pr-3 nowrap">태그</th>
+    </tr></thead><tbody>`
+  ];
+
   for (const t of rows) {
     const pnl = formatPnL(t), r = rate(t);
     out.push(`<tr class="border-t border-slate-100">
@@ -645,42 +709,33 @@ async function renderCalendarList(dateStr) {
       <td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
       <td class="py-1 pr-3 nowrap">${t.tags||''}</td></tr>`);
   }
+
   out.push(`</tbody></table></div>`);
   const host = document.getElementById('calendarList');
   host.innerHTML = out.join('');
 
-  // 날짜 선택 음영
   highlightCalendarDate(dateStr);
 
-  // 상세보기
   host.querySelectorAll('.link-symbol').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = Number(btn.getAttribute('data-id'));
-      const rec = await idbGet(id);
-      if (rec) openDetail(rec);
+      await openDetailWithViewCount(id);
     });
   });
 
-  // 📊 버튼 → 메모/이미지 모달
   const noteBtn = document.getElementById('dayNoteBtn');
-  if (noteBtn) {
-    noteBtn.addEventListener('click', () => openNoteModal(dateStr));
-  }
+  if (noteBtn) noteBtn.addEventListener('click', () => openNoteModal(dateStr));
 }
 
 async function renderWeekList(weekStart) {
   const ws = new Date(weekStart);
-  const we = new Date(ws); 
-  we.setDate(we.getDate()+6);
+  const we = new Date(ws); we.setDate(we.getDate()+6);
 
   const sKey = ws.toISOString().slice(0,10);
   const eKey = we.toISOString().slice(0,10);
 
   const all = await idbAll();
-  const rows = all
-      .filter(t => t.date >= sKey && t.date <= eKey)
-      .sort((a,b)=> (a.date||'').localeCompare(b.date||''));
-
+  const rows = all.filter(t => t.date >= sKey && t.date <= eKey).sort((a,b)=> (a.date||'').localeCompare(b.date||''));
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
 
   const out = [
@@ -712,23 +767,9 @@ async function renderWeekList(weekStart) {
     out.push(`
       <tr class="border-t border-slate-100">
         <td class="py-1 pr-3 nowrap">${fmtDateNoYear(t.date)}</td>
-        <td class="py-1 pr-3 nowrap">
-          <button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button>
-        </td>
-        <td class="py-1 pr-3 nowrap text-right">
-          ${
-            r>=0
-            ? `<span class="pnl-pos">${r.toFixed(2)}%</span>`
-            : `<span class="pnl-neg">${r.toFixed(2)}%</span>`
-          }
-        </td>
-        <td class="py-1 pr-3 nowrap text-right">
-          ${
-            pnl>=0
-            ? `<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`
-            : `<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`
-          }
-        </td>
+        <td class="py-1 pr-3 nowrap"><button class="link-symbol underline" data-id="${t.id}">${t.symbol}</button></td>
+        <td class="py-1 pr-3 nowrap text-right">${r>=0 ? `<span class="pnl-pos">${r.toFixed(2)}%</span>` : `<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
+        <td class="py-1 pr-3 nowrap text-right">${pnl>=0 ? `<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>` : `<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
         <td class="py-1 pr-3 nowrap">${t.tags || ''}</td>
       </tr>
     `);
@@ -742,12 +783,10 @@ async function renderWeekList(weekStart) {
   host.querySelectorAll('.link-symbol').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = Number(btn.getAttribute('data-id'));
-      const rec = await idbGet(id);
-      if (rec) openDetail(rec);
+      await openDetailWithViewCount(id);
     });
   });
 
-  // 주간합계 클릭 시는 특정 날짜 음영 없음
   highlightCalendarDate(null);
 }
 
@@ -778,6 +817,8 @@ async function importJSON(file) {
   if (!obj || !Array.isArray(obj.trades)) return;
   for (const t of obj.trades) {
     delete t.id;
+    if (typeof t.views !== 'number') t.views = 0;
+    if (typeof t.highlight !== 'boolean') t.highlight = false;
     await idbAdd(t);
   }
   await populateMonthSelect();
@@ -827,7 +868,6 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     if (e.target.files && e.target.files[0]) importJSON(e.target.files[0]);
   });
 
-  // Form submit with compression (HQ profile: 2000px, q=0.85)
   $('#tradeForm').addEventListener('submit', async (e)=>{
     e.preventDefault();
     const f = e.target;
@@ -854,16 +894,14 @@ window.addEventListener('beforeinstallprompt', (e)=>{
       comment: f.comment.value,
       image1: img1,
       image2: img2,
+      highlight: !!(f.highlight && f.highlight.checked),
+      views: prev ? Number(prev.views || 0) : 0,
       created_at: prev ? prev.created_at : new Date().toISOString()
     };
-    if (payload.id) {
-      await idbPut(payload);
-      alert('수정 완료');
-      openDetail(payload);
-    } else {
-      await idbAdd(payload);
-      alert('저장 완료');
-    }
+
+    if (payload.id) { await idbPut(payload); alert('수정 완료'); openDetail(payload); }
+    else { await idbAdd(payload); alert('저장 완료'); }
+
     clearForm();
     await populateMonthSelect();
     await renderList();
@@ -891,10 +929,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
   });
 
   await initCalendar();
-
-  // 메모 모달/전체화면 초기화
   setupNoteModalEvents();
 })();
 
-// flag to confirm JS loaded
 window.__APP_OK__ = true;
