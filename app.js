@@ -433,7 +433,8 @@ function openDetail(t){
         <div class="font-medium whitespace-pre-wrap">${t.tags || ''}</div>
       </div>
       <div style="grid-column: 1 / -1;">
-        <div class="mt-1 p-2 rounded border border-slate-200 bg-slate-50 whitespace-pre">
+        <div class="text-slate-500 text-sm">코멘트</div>
+        <div class="mt-1 p-2 rounded border border-slate-200 bg-slate-50 whitespace-pre-wrap break-words">
           ${t.comment || ''}
         </div>
       </div>
