@@ -20,7 +20,7 @@
     /* Ensure the modal is hidden until explicitly opened */
     .modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); align-items: center; justify-content: center; z-index: 50; }
     .modal-mask.show { display: flex; }
-    .modal-card { background: #fff; border-radius: .75rem; padding: 1rem; max-width: 640px; width: calc(100% - 2rem); }
+    .modal-card { background: #fff; border-radius: .75rem; padding: 1rem; max-width: 640px; width: calc(100% - 2rem); position: relative; }
     .modal-close { position: absolute; top: .75rem; right: .75rem; }
     /* Basic button/tab styles in case styles33.css didn't load */
     .tab-btn { padding: .5rem .75rem; border-radius: .75rem; background: #e5e7eb; }
@@ -47,15 +47,11 @@
     .cal-selected-day {
       background-color: rgba(59,130,246,0.16) !important; /* blue-500/15 */
       border-radius: 0.5rem;
-    }  
+    }
 
     /* 전체 화면 이미지 뷰어용 */
-    #imgFullscreen {
-      display: none;
-    }
-    #imgFullscreen.show {
-      display: flex;
-    }
+    #imgFullscreen { display: none; }
+    #imgFullscreen.show { display: flex; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
@@ -79,6 +75,13 @@
         <input type="hidden" name="id" value="">
         <label class="label">날짜 <input type="date" name="date" required class="input"></label>
         <label class="label">종목명 <input type="text" name="symbol" required class="input" placeholder="종목명"></label>
+
+        <!-- ✅ 종목 강조 체크 -->
+        <label class="inline-flex items-center gap-2">
+          <input type="checkbox" name="highlight">
+          <span class="text-sm text-slate-600">종목 강조 표시</span>
+        </label>
+
         <div class="grid grid-cols-3 gap-2">
           <label class="label">수량 <input type="number" name="qty" step="1" class="input"></label>
           <label class="label">매수가 <input type="number" name="buy_price" step="0.01" class="input"></label>
@@ -87,7 +90,7 @@
 
         <fieldset class="label">
           <legend class="mb-1 font-semibold">Tags</legend>
-        
+
           <!-- 전략 -->
           <div class="mb-2">
             <div class="text-xs text-slate-400 mb-1">전략</div>
@@ -96,7 +99,7 @@
               <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="눌림진입"> 눌림진입</label>
             </div>
           </div>
-        
+
           <!-- 감정 -->
           <div class="mb-2">
             <div class="text-xs text-slate-400 mb-1">감정</div>
@@ -105,7 +108,7 @@
               <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="충동"> 충동</label>
             </div>
           </div>
-        
+
           <!-- 성과 -->
           <div class="mb-2">
             <div class="text-xs text-slate-400 mb-1">성과</div>
@@ -114,7 +117,7 @@
               <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="큰손실"> 큰손실</label>
             </div>
           </div>
-        
+
           <!-- 리스크 -->
           <div class="mb-1">
             <div class="text-xs text-slate-400 mb-1">리스크</div>
@@ -123,7 +126,7 @@
               <label class="flex items-center gap-1"><input type="checkbox" name="tags[]" value="리스크과다"> 리스크과다</label>
             </div>
           </div>
-        
+
         </fieldset>
 
         <textarea name="comment" rows="3" class="input w-full" placeholder=""></textarea>
@@ -184,7 +187,7 @@
     </section>
 
     <!-- DETAIL MODAL -->
-    <div id="detailModal" class="modal-mask"><!-- hidden via CSS until .show -->
+    <div id="detailModal" class="modal-mask">
       <div class="modal-card">
         <button id="detailClose" class="modal-close">닫기</button>
         <div id="detailContent"></div>
@@ -199,11 +202,9 @@
           <span id="noteDateLabel">일자 메모 및 이미지</span>
         </h3>
 
-        <!-- 메모 -->
         <textarea id="noteText" class="w-full border rounded p-2 mb-3" rows="4"
                   placeholder="오늘 일기 / 지수 흐름 등을 기록하세요"></textarea>
 
-        <!-- 이미지 2개 나란히 -->
         <div class="flex gap-2">
           <div class="w-1/2">
             <button id="noteImg1Btn" class="btn-secondary w-full mb-1">이미지 1 선택</button>
@@ -219,14 +220,12 @@
       </div>
     </div>
 
-    <!-- 전체 화면 이미지 뷰어 -->
     <div id="imgFullscreen" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-[60]">
       <img id="imgFullscreenImg" class="max-w-full max-h-full">
     </div>
 
   </div>
 
-  <!-- JS 로드 -->
   <script type="module" src="./app.js"></script>
   <script>
     console.log("[boot] index.html loaded");
