@@ -4,11 +4,18 @@ let lastOpenedDetail = null;
  *
  * v6.2 (requested):
  * 1) Fee/Tax auto included in PnL: (buyAmount + sellAmount) * 0.23%
- * 2) List grouped by day with alternating background + show distinct symbol count per day
+ * 2) List grouped by day with alternating background
  * 3) Add "highlight" checkbox support -> show marker next to symbol in list
  * 4) View count increments on every open from list/calendar and shown in list column
  * 5) Hide tags column from list (search still matches tags)
  * 6) List header order: 날짜, 종목, 수익률, 손익, 조회
+ *
+ * v6.3 (extra tweaks):
+ * A) List fits without horizontal scroll as much as possible (table-fixed, widths, smaller padding)
+ * B) Remove (종목수) next to date + make alternating bg more visible
+ * C) Profit rate includes -0.23% adjustment (fixed)
+ * D) Detail modal: hide 조회수, hide 수수료/세금
+ * E) Detail modal label "손익" only
  */
 
 // ---------- Tiny IndexedDB helper ----------
@@ -78,7 +85,7 @@ function calcFeeTax(t){
   return (buyAmount + sellAmount) * FEE_RATE;
 }
 
-// (1) PnL now includes fee/tax
+// (1) PnL includes fee/tax (buy+sell based)
 function formatPnL(t) {
   const qty = Number(t.qty || 0);
   const buyPrice = Number(t.buy_price || 0);
@@ -90,7 +97,15 @@ function formatPnL(t) {
   return grossPnL - feeAndTax;
 }
 
-function rate(t) { if (!t.buy_price) return 0; return ((Number(t.sell_price||0) / Number(t.buy_price||0)) - 1) * 100; }
+// (C) Rate includes -0.23% fixed adjustment
+function rate(t) {
+  const buy = Number(t.buy_price || 0);
+  const sell = Number(t.sell_price || 0);
+  if (!buy) return 0;
+
+  const gross = (sell / buy - 1) * 100;
+  return gross - 0.23;
+}
 
 function fmtDateNoYear(s){ if(!s) return ''; return s.slice(5); } // YYYY-MM-DD -> MM-DD
 function fmtNumber(n){ try { return Number(n).toLocaleString('ko-KR'); } catch { return String(n); } }
@@ -307,29 +322,22 @@ async function renderList() {
     return 0;
   });
 
-  // (2) distinct symbol count per day (within filtered rows)
-  const daySymbolMap = new Map(); // date -> Set(symbol)
-  for (const t of rows) {
-    const d = t.date || '';
-    if (!d) continue;
-    if (!daySymbolMap.has(d)) daySymbolMap.set(d, new Set());
-    daySymbolMap.get(d).add((t.symbol || '').trim());
-  }
+  // (A) Make list fit without horizontal scroll: table-fixed + explicit widths + smaller padding
+  const table = [`<table class="min-w-full table-fixed text-xs">
+    <thead class="text-slate-500">
+      <tr>
+        <th class="py-1 pr-2 w-14 text-left">날짜</th>
+        <th class="py-1 pr-2 text-left">종목</th>
+        <th class="py-1 pr-2 w-16 text-right">수익률</th>
+        <th class="py-1 pr-2 w-20 text-right">손익</th>
+        <th class="py-1 pr-2 w-14 text-right">조회</th>
+      </tr>
+    </thead>
+    <tbody>`];
 
-  // (5) Hide tags column from list
-  // (4) Add views column
-  // (6) Header order: 날짜, 종목, 수익률, 손익, 조회
-  const table = [`<table class="min-w-full text-sm"><thead class="text-slate-500"><tr>
-    <th class="py-2 pr-3 nowrap">날짜</th>
-    <th class="py-2 pr-3 nowrap">종목</th>
-    <th class="py-2 pr-3 nowrap text-right">수익률</th>
-    <th class="py-2 pr-3 nowrap text-right">손익</th>
-    <th class="py-2 pr-3 nowrap text-right">조회</th>
-  </tr></thead><tbody>`];
-
-  // (2) alternate bg by day
+  // (B) alternate bg by day (more visible)
   let lastDate = null;
-  let alt = false; // false white, true light gray
+  let alt = false;
 
   for (const t of rows) {
     const pnl = formatPnL(t);
@@ -337,31 +345,30 @@ async function renderList() {
 
     const d = t.date || '';
     if (d !== lastDate) { alt = !alt; lastDate = d; }
-    const rowBg = alt ? 'bg-slate-50' : 'bg-white';
+    const rowBg = alt ? 'bg-slate-100' : 'bg-white';
 
-    // (2) show distinct symbols count in date cell
-    const symCount = d && daySymbolMap.get(d) ? daySymbolMap.get(d).size : 0;
-    const dateCell = d
-      ? `${fmtDateNoYear(d)} <span class="text-slate-400">(${symCount})</span>`
-      : '';
+    // (B) Remove (종목수) next to date
+    const dateCell = d ? `${fmtDateNoYear(d)}` : '';
 
     // (3) highlight marker next to symbol
     const symbolHtml = (t.highlight)
       ? `<span class="inline-flex items-center gap-1 font-semibold">
-           <span class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>${t.symbol||''}
+           <span class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
+           <span class="truncate">${t.symbol||''}</span>
          </span>`
-      : (t.symbol||'');
+      : `<span class="truncate">${t.symbol||''}</span>`;
 
     const views = Number(t.views || 0);
 
-    table.push(`<tr class="border-t border-slate-100 hover:bg-slate-100 cursor-pointer ${rowBg}" data-id="${t.id}">
-      <td class="py-1 pr-3 nowrap">${dateCell}</td>
-      <td class="py-1 pr-3 nowrap">${symbolHtml}</td>
-      <td class="py-1 pr-3 nowrap text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
-      <td class="py-1 pr-3 nowrap text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
-      <td class="py-1 pr-3 nowrap text-right text-slate-500">${fmtNumber(views)}</td>
+    table.push(`<tr class="border-t border-slate-200 hover:bg-slate-200 cursor-pointer ${rowBg}" data-id="${t.id}">
+      <td class="py-1 pr-2">${dateCell}</td>
+      <td class="py-1 pr-2 truncate">${symbolHtml}</td>
+      <td class="py-1 pr-2 text-right">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
+      <td class="py-1 pr-2 text-right">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
+      <td class="py-1 pr-2 text-right text-slate-600">${fmtNumber(views)}</td>
     </tr>`);
   }
+
   table.push(`</tbody></table>`);
   $('#listContainer').innerHTML = table.join('');
 
@@ -393,13 +400,12 @@ async function renderList() {
 // ---------- Detail Modal ----------
 function openDetail(t){
   lastOpenedDetail = t;
+
   const pnl = formatPnL(t);
   const r = rate(t);
-
   const buyAmount = calcBuyAmount(t);
-  const sellAmount = calcSellAmount(t);
-  const feeAndTax = Math.round((buyAmount + sellAmount) * FEE_RATE);
 
+  // (D, E) Hide views/fee-tax details, label "손익" only
   const html = `
     <div class="detail-grid">
       <div>
@@ -411,28 +417,16 @@ function openDetail(t){
         <div class="font-medium">${t.symbol||''}</div>
       </div>
       <div>
-        <div class="text-slate-500 text-sm">조회수</div>
-        <div class="font-medium">${fmtNumber(t.views||0)}</div>
-      </div>
-      <div>
         <div class="text-slate-500 text-sm">수익률</div>
         <div class="font-semibold">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</div>
       </div>
       <div>
-        <div class="text-slate-500 text-sm">손익(수수료·세금 반영)</div>
+        <div class="text-slate-500 text-sm">손익</div>
         <div class="font-semibold">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</div>
       </div>
       <div>
         <div class="text-slate-500 text-sm">매수금액</div>
         <div class="font-medium">${fmtNumber(Math.round(buyAmount))}</div>
-      </div>
-      <div>
-        <div class="text-slate-500 text-sm">매도금액</div>
-        <div class="font-medium">${fmtNumber(Math.round(sellAmount))}</div>
-      </div>
-      <div>
-        <div class="text-slate-500 text-sm">수수료·세금(0.23%)</div>
-        <div class="font-medium">-${fmtNumber(feeAndTax)}</div>
       </div>
       <div style="grid-column: 1 / -1;">
         <div class="text-slate-500 text-sm">코멘트</div>
@@ -443,6 +437,7 @@ function openDetail(t){
         ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
       </div>
     </div>`;
+
   $('#detailContent').innerHTML = html;
   const modal = $('#detailModal');
   modal.classList.add('show');
