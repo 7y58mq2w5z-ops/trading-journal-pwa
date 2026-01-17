@@ -436,7 +436,7 @@ function openDetail(t){
         <div class="text-slate-500 text-sm">코멘트</div>
         <div id="detailComment"
              class="mt-1 p-2 rounded border border-slate-200 bg-slate-50
-                    whitespace-pre overflow-x-auto text-xs leading-relaxed"></div>
+                    whitespace-pre overflow-x-auto text-sm leading-relaxed"></div>
       </div>
       <div class="detail-images" style="display:flex;gap:.75rem;">
         ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
