@@ -433,8 +433,9 @@ function openDetail(t){
         <div class="font-medium whitespace-pre-wrap">${t.tags || ''}</div>
       </div>
       <div style="grid-column: 1 / -1;">
-        <div class="text-slate-500 text-sm">코멘트</div>
-        <div class="mt-1 p-2 rounded border border-slate-200 bg-slate-50 whitespace-pre-wrap">${t.comment||''}</div>
+        <div class="mt-1 p-2 rounded border border-slate-200 bg-slate-50 whitespace-pre">
+          ${t.comment || ''}
+        </div>
       </div>
       <div class="detail-images" style="display:flex;gap:.75rem;">
         ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
