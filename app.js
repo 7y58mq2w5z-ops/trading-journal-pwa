@@ -435,7 +435,7 @@ function openDetail(t){
       <div style="grid-column: 1 / -1;">
         <div class="text-slate-500 text-sm">코멘트</div>
         <div class="mt-1 p-2 rounded border border-slate-200 bg-slate-50 whitespace-pre-wrap break-words">
-          ${t.comment || ''}
+          ${(t.comment || '').replace(/^\s+/, '')}
         </div>
       </div>
       <div class="detail-images" style="display:flex;gap:.75rem;">
