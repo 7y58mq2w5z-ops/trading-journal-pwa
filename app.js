@@ -327,10 +327,10 @@ async function renderList() {
     <thead class="text-slate-500">
       <tr>
         <th class="py-1 pr-2 w-16 text-left whitespace-nowrap">날짜</th>
-        <th class="py-1 pr-2 w-24 text-left whitespace-nowrap">종목</th>
+        <th class="py-1 pr-2 w-27text-left whitespace-nowrap">종목</th>
         <th class="py-1 pr-2 w-16 text-right whitespace-nowrap">수익률</th>
         <th class="py-1 pr-2 w-20 text-right whitespace-nowrap">손익</th>
-        <th class="py-1 pr-2 w-14 text-right whitespace-nowrap">조회</th>
+        <th class="py-1 pr-2 w-11 text-right whitespace-nowrap">조회</th>
       </tr>
     </thead>
     <tbody>`];
