@@ -327,7 +327,7 @@ async function renderList() {
     <thead class="text-slate-500">
       <tr>
         <th class="py-1 pr-2 w-16 text-left whitespace-nowrap">날짜</th>
-        <th class="py-1 pr-2 text-left whitespace-nowrap">종목</th>
+        <th class="py-1 pr-2 w-24 text-left whitespace-nowrap">종목</th>
         <th class="py-1 pr-2 w-16 text-right whitespace-nowrap">수익률</th>
         <th class="py-1 pr-2 w-20 text-right whitespace-nowrap">손익</th>
         <th class="py-1 pr-2 w-14 text-right whitespace-nowrap">조회</th>
@@ -352,17 +352,17 @@ async function renderList() {
 
     // (3) highlight marker next to symbol
     const symbolHtml = (t.highlight)
-      ? `<span class="inline-flex items-center gap-1 font-semibold">
+      ? `<span class="inline-flex items-center gap-1 font-semibold max-w-full overflow-hidden">
            <span class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
-           <span class="truncate">${t.symbol||''}</span>
+           <span class="block overflow-hidden text-ellipsis whitespace-nowrap">${t.symbol||''}</span>
          </span>`
-      : `<span class="truncate">${t.symbol||''}</span>`;
+      : `<span class="block overflow-hidden text-ellipsis whitespace-nowrap">${t.symbol||''}</span>`;
 
     const views = Number(t.views || 0);
 
     table.push(`<tr class="border-t border-slate-200 cursor-pointer ${rowBg}" data-id="${t.id}">
       <td class="py-1 pr-2 whitespace-nowrap">${dateCell}</td>
-      <td class="py-1 pr-2 truncate">${symbolHtml}</td>
+      <td class="py-1 pr-2 w-24 max-w-24 overflow-hidden text-ellipsis whitespace-nowrap">${symbolHtml}</td>
       <td class="py-1 pr-2 text-right whitespace-nowrap">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
       <td class="py-1 pr-2 text-right whitespace-nowrap">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
       <td class="py-1 pr-2 text-right text-slate-600 whitespace-nowrap">${fmtNumber(views)}</td>
