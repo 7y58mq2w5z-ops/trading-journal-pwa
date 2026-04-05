@@ -327,10 +327,10 @@ async function renderList() {
     <thead class="text-slate-500">
       <tr>
         <th class="py-1 pr-2 w-16 text-left whitespace-nowrap">날짜</th>
-        <th class="py-1 pr-2 w-27text-left whitespace-nowrap">종목</th>
+        <th class="py-1 pr-2 w-28 text-left whitespace-nowrap">종목</th>
         <th class="py-1 pr-2 w-16 text-right whitespace-nowrap">수익률</th>
         <th class="py-1 pr-2 w-20 text-right whitespace-nowrap">손익</th>
-        <th class="py-1 pr-2 w-11 text-right whitespace-nowrap">조회</th>
+        <th class="py-1 pr-2 w-12 text-right whitespace-nowrap">조회</th>
       </tr>
     </thead>
     <tbody>`];
@@ -362,10 +362,10 @@ async function renderList() {
 
     table.push(`<tr class="border-t border-slate-200 cursor-pointer ${rowBg}" data-id="${t.id}">
       <td class="py-1 pr-2 whitespace-nowrap">${dateCell}</td>
-      <td class="py-1 pr-2 w-24 max-w-24 overflow-hidden text-ellipsis whitespace-nowrap">${symbolHtml}</td>
+      <td class="py-1 pr-2 w-28 max-w-28 overflow-hidden text-ellipsis whitespace-nowrap">${symbolHtml}</td>
       <td class="py-1 pr-2 text-right whitespace-nowrap">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
       <td class="py-1 pr-2 text-right whitespace-nowrap">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
-      <td class="py-1 pr-2 text-right text-slate-600 whitespace-nowrap">${fmtNumber(views)}</td>
+      <td class="py-1 pr-2 w-12 text-right text-slate-600 whitespace-nowrap">${fmtNumber(views)}</td>
     </tr>`);
   }
 
