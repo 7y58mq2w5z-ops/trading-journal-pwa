@@ -87,24 +87,17 @@ function calcFeeTax(t){
 
 // (1) PnL includes fee/tax (buy+sell based)
 function formatPnL(t) {
-  const qty = Number(t.qty || 0);
-  const buyPrice = Number(t.buy_price || 0);
-  const sellPrice = Number(t.sell_price || 0);
-
-  const grossPnL = (sellPrice - buyPrice) * qty;
-  const feeAndTax = calcFeeTax(t);
-
-  return grossPnL - feeAndTax;
+  return Number(t.pnl_val || 0);
 }
 
 // (C) Rate includes -0.23% fixed adjustment
 function rate(t) {
-  const buy = Number(t.buy_price || 0);
-  const sell = Number(t.sell_price || 0);
-  if (!buy) return 0;
+  const buyAmount = calcBuyAmount(t);
+  const pnl = formatPnL(t);
+  if (buyAmount <= 0) return 0;
 
-  const gross = (sell / buy - 1) * 100;
-  return gross - 0.23;
+  // 수익률 = (실현손익 / 매수금액) * 100
+  return (pnl / buyAmount) * 100;
 }
 
 function fmtDateNoYear(s){ if(!s) return ''; return s.slice(5); } // YYYY-MM-DD -> MM-DD
@@ -404,6 +397,9 @@ function openDetail(t){
   const pnl = formatPnL(t);
   const r = rate(t);
   const buyAmount = calcBuyAmount(t);
+  const dayMemo = safeLocalGet('note:' + t.date) || '기록된 일자 메모가 없습니다.';
+  const dayImg1 = safeLocalGet('noteImg1:' + t.date);
+  const dayImg2 = safeLocalGet('noteImg2:' + t.date);
 
   // (D, E) Hide views/fee-tax details, label "손익" only
   const html = `
@@ -441,6 +437,19 @@ function openDetail(t){
       <div class="detail-images" style="display:flex;gap:.75rem;">
         ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
         ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
+      </div>
+    </div>
+    <div class="detail-images" style="display:flex;gap:.75rem;">
+      ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
+      ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
+    </div>
+    <hr class="my-4 border-slate-200">
+    <div class="mt-4">
+      <div class="text-slate-500 text-sm mb-2">📅 해당 일자 메모 & 이미지</div>
+      <div class="p-3 bg-amber-50 rounded border border-amber-100 text-sm whitespace-pre-wrap">${dayMemo}</div>
+      <div class="flex gap-2 mt-2">
+        ${dayImg1 ? `<img src="${dayImg1}" class="detail-img" style="width:100px; height:100px; object-fit:cover; border-radius:4px;">` : ''}
+        ${dayImg2 ? `<img src="${dayImg2}" class="detail-img" style="width:100px; height:100px; object-fit:cover; border-radius:4px;">` : ''}
       </div>
     </div>`;
 
@@ -892,7 +901,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
       symbol: f.symbol.value.trim(),
       qty: Number(f.qty.value||0),
       buy_price: Number(f.buy_price.value||0),
-      sell_price: Number(f.sell_price.value||0),
+      pnl_val: Number(f.pnl_val.value||0),
       tags,
       comment: f.comment.value,
       image1: img1,
