@@ -48,7 +48,10 @@
       background-color: rgba(59,130,246,0.16) !important; /* blue-500/15 */
       border-radius: 0.5rem;
     }
-
+    /* FullCalendar 기본 클릭 강조색(회색)을 투명하게 제거 */
+    .fc .fc-highlight {
+      background: transparent !important;
+    }
     /* 전체 화면 이미지 뷰어용 */
     #imgFullscreen { display: none; }
     #imgFullscreen.show { display: flex; }
