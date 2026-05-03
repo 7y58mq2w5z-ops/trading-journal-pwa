@@ -1,189 +1,139 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Trading Journal</title>
-  <link rel="manifest" href="manifest33.json">
-  <meta name="theme-color" content="#0f172a"/>
   <link rel="stylesheet" href="styles33.css">
-  <!-- Tailwind (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- FullCalendar -->
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet"/>
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <style>
-    .modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); align-items: center; justify-content: center; z-index: 50; }
+    .modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); align-items: center; justify-content: center; z-index: 50; padding: 1rem; }
     .modal-mask.show { display: flex; }
-    .modal-card { background: #fff; border-radius: .75rem; padding: 1rem; max-width: 640px; width: calc(100% - 2rem); position: relative; max-height: 90vh; overflow-y: auto; }
-    .modal-close { position: absolute; top: .75rem; right: .75rem; font-weight: bold; }
-    .tab-btn { padding: .5rem .75rem; border-radius: .75rem; background: #e5e7eb; transition: all 0.2s; }
+    .modal-card { background: #fff; border-radius: 1rem; padding: 1.25rem; max-width: 500px; width: 100%; position: relative; max-height: 90vh; overflow-y: auto; }
+    .tab-btn { padding: .6rem; border-radius: .75rem; background: #e5e7eb; font-weight: 500; }
     .tab-active { background: #111827; color: #fff; }
-    .card { background: #fff; border-radius: .75rem; padding: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
-    .input { border:1px solid #e5e7eb; border-radius:.5rem; padding:.5rem .75rem; width: 100%; }
-    .btn-secondary { border:1px solid #e5e7eb; border-radius:.5rem; padding:.5rem .75rem; background:#f8fafc; cursor: pointer; }
-    .btn-save { background:#10b981; color:#fff; border-radius:.5rem; padding:.5rem .75rem; flex: 1; }
-    .btn-new { background: #374151; color: #fff; border-radius: .5rem; padding: .5rem .75rem; flex: 1; }
-    .btn-danger { background:#ef4444; color:#fff; border-radius:.5rem; padding:.5rem .75rem; }
-    .pnl-pos { color:#dc2626 !important; font-weight:600; }
-    .pnl-neg { color:#2563eb !important; font-weight:600; }
-    .detail-img { border-radius:.75rem; box-shadow: 0 2px 8px rgba(0,0,0,.08); width:100%; object-fit:contain; cursor: zoom-in; }
-    .detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap: .75rem; }
-    .cal-selected-day { background-color: rgba(59,130,246,0.16) !important; border-radius: 0.5rem; }
+    .card { background: #fff; border-radius: 1rem; padding: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .input { border:1px solid #e2e8f0; border-radius:.5rem; padding:.5rem; width: 100%; outline: none; }
+    .input:focus { border-color: #3b82f6; }
+    .pnl-pos { color: #dc2626 !important; }
+    .pnl-neg { color: #2563eb !important; }
+    /* 리스트 한 줄 유지 */
+    .nowrap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* 이미지 수평 나열 */
+    .detail-images { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+    .detail-img-wrapper { width: 50%; aspect-ratio: 16/9; overflow: hidden; border-radius: 0.5rem; border: 1px solid #f1f5f9; }
+    .detail-img-wrapper img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen">
-  <div id="app" class="max-w-3xl mx-auto p-4 pb-24">
-    <header class="flex items-center justify-between mb-4">
-      <h1 class="text-xl font-bold text-slate-800">📊 매매일지 Pro</h1>
-      <button id="installBtn" class="px-3 py-2 rounded-xl bg-emerald-600 text-white hidden text-sm">앱 설치</button>
-    </header>
+<body class="bg-slate-50 text-slate-900">
+  <div id="app" class="max-w-md mx-auto p-4 pb-20">
+    <header class="mb-4 text-center"><h1 class="text-xl font-bold">📈 My Trading Journal</h1></header>
 
-    <!-- Tabs -->
-    <nav class="grid grid-cols-3 gap-2 sticky top-0 z-10 mb-3 bg-slate-50/80 backdrop-blur-sm py-2">
+    <nav class="grid grid-cols-3 gap-2 sticky top-0 z-20 bg-slate-50 py-2 mb-4">
       <button data-tab="form" class="tab-btn">입력</button>
       <button data-tab="list" class="tab-btn tab-active">리스트</button>
       <button data-tab="calendar" class="tab-btn">캘린더</button>
     </nav>
 
-    <!-- FORM SECTION -->
+    <!-- 입력 섹션 -->
     <section id="tab-form" class="card hidden">
-      <h2 class="text-lg font-semibold mb-3">거래 기록하기</h2>
-      <form id="tradeForm" class="grid grid-cols-1 gap-3">
-        <input type="hidden" name="id" value="">
-        <div class="grid grid-cols-2 gap-2">
-          <label class="text-sm font-medium">날짜 <input type="date" name="date" required class="input mt-1"></label>
-          <label class="text-sm font-medium">종목명 <input type="text" name="symbol" required class="input mt-1" placeholder="종목명"></label>
+      <form id="tradeForm" class="space-y-3">
+        <input type="hidden" name="id">
+        <!-- 4번: 날짜/종목명 수평 일렬 맞춤 -->
+        <div class="flex gap-2">
+          <div class="flex-1">
+            <label class="text-xs font-bold text-slate-500">날짜</label>
+            <input type="date" name="date" required class="input">
+          </div>
+          <div class="flex-1">
+            <label class="text-xs font-bold text-slate-500">종목명</label>
+            <input type="text" name="symbol" required class="input" placeholder="종목명">
+          </div>
         </div>
-
-        <label class="inline-flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" name="highlight" class="w-4 h-4 text-emerald-600">
-          <span class="text-sm text-slate-600 font-medium">중요 종목으로 강조</span>
-        </label>
 
         <div class="grid grid-cols-3 gap-2">
-          <label class="text-sm font-medium">수량 <input type="number" name="qty" step="1" class="input mt-1" placeholder="0"></label>
-          <label class="text-sm font-medium">매수가 <input type="number" name="buy_price" step="0.01" class="input mt-1" placeholder="0"></label>
-          <label class="text-sm font-medium text-emerald-600">실현손익 <input type="number" name="pnl_input" step="1" class="input mt-1 border-emerald-200" placeholder="± 0"></label>
+          <label class="text-xs font-bold text-slate-500">수량<input type="number" name="qty" class="input"></label>
+          <label class="text-xs font-bold text-slate-500">매수가<input type="number" name="buy_price" class="input"></label>
+          <label class="text-xs font-bold text-slate-500 text-red-500">실현손익<input type="number" name="pnl_input" class="input"></label>
         </div>
 
-        <fieldset class="border border-slate-100 p-3 rounded-lg">
-          <legend class="px-2 text-xs font-bold text-slate-400">태그 선택</legend>
-          <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="돌파진입"> 돌파진입</label>
-            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="눌림진입"> 눌림진입</label>
-            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="차분"> 차분</label>
-            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="충동"> 충동</label>
-            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="좋은매매"> 좋은매매</label>
-            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="큰손실"> 큰손실</label>
-            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="손절지연"> 손절지연</label>
-            <label class="flex items-center gap-2"><input type="checkbox" name="tags[]" value="리스크과다"> 리스크과다</label>
-          </div>
-        </fieldset>
+        <textarea name="comment" rows="3" class="input text-sm" placeholder="매매 복기..."></textarea>
 
-        <label class="text-sm font-medium">매매 복기 / 코멘트
-          <textarea name="comment" rows="3" class="input mt-1 w-full" placeholder="진입 이유와 대응 내용을 적어주세요."></textarea>
-        </label>
-
+        <!-- 5번: 파일명 표시 기능 포함된 이미지 업로드 -->
         <div class="grid grid-cols-2 gap-2">
-          <label class="relative block">
-            <span class="btn-secondary block text-center text-sm">차트 이미지 1</span>
-            <input type="file" name="image1" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
-          </label>
-          <label class="relative block">
-            <span class="btn-secondary block text-center text-sm">차트 이미지 2</span>
-            <input type="file" name="image2" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
-          </label>
+          <div>
+            <label class="block text-center p-2 bg-slate-100 rounded-lg text-xs cursor-pointer border border-dashed border-slate-300">
+              이미지 1 선택
+              <input type="file" name="image1" class="hidden file-input" data-target="file-name-1">
+            </label>
+            <div id="file-name-1" class="text-[10px] text-slate-400 mt-1 truncate px-1">선택된 파일 없음</div>
+          </div>
+          <div>
+            <label class="block text-center p-2 bg-slate-100 rounded-lg text-xs cursor-pointer border border-dashed border-slate-300">
+              이미지 2 선택
+              <input type="file" name="image2" class="hidden file-input" data-target="file-name-2">
+            </label>
+            <div id="file-name-2" class="text-[10px] text-slate-400 mt-1 truncate px-1">선택된 파일 없음</div>
+          </div>
         </div>
 
-        <div class="flex gap-2 mt-4">
-          <button class="btn-save font-bold" type="submit" id="saveBtn">일지 저장</button>
-          <button class="btn-new" type="button" id="cancelBtn">초기화</button>
-          <button class="btn-danger hidden" type="button" id="deleteTrade">삭제</button>
+        <div class="flex gap-2 pt-2">
+          <button type="submit" id="saveBtn" class="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold">저장하기</button>
+          <button type="button" id="cancelBtn" class="px-4 bg-slate-200 rounded-xl text-sm">취소</button>
+          <button type="button" id="deleteTrade" class="hidden px-4 bg-red-100 text-red-600 rounded-xl text-sm font-bold">삭제</button>
         </div>
       </form>
     </section>
 
-    <!-- LIST SECTION -->
+    <!-- 리스트 섹션 -->
     <section id="tab-list" class="card">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-semibold">매매 리스트</h2>
-        <div class="flex gap-1">
-          <button id="exportBtn" class="text-xs btn-secondary px-2 py-1">백업</button>
-          <label class="text-xs btn-secondary px-2 py-1 relative overflow-hidden">
-            복구
-            <input id="importInput" type="file" accept="application/json" class="absolute inset-0 opacity-0 cursor-pointer">
-          </label>
-        </div>
-      </div>
-      
-      <div class="flex gap-2 mb-3">
-        <input id="searchInput" class="input text-sm flex-1" placeholder="종목명 또는 태그 검색">
-        <select id="sortSelect" class="input text-sm w-28">
-          <option value="date_desc">최신순</option>
-          <option value="date_asc">과거순</option>
-          <option value="pnl_desc">수익순</option>
-          <option value="pnl_asc">손실순</option>
-        </select>
-      </div>
-
-      <div id="listContainer" class="min-h-[200px]"></div>
-
-      <div class="mt-6 pt-4 border-t border-slate-100">
-        <h3 class="text-sm font-bold text-slate-500 mb-3">누적 손익 추이</h3>
-        <div class="h-[200px]">
-          <canvas id="pnlChart"></canvas>
-        </div>
-      </div>
+      <div id="listContainer" class="overflow-hidden"></div>
+      <div class="mt-6"><canvas id="pnlChart" height="150"></canvas></div>
     </section>
 
-    <!-- CALENDAR SECTION -->
+    <!-- 캘린더 섹션 (8번 기능 복구) -->
     <section id="tab-calendar" class="card hidden">
-      <h2 class="text-lg font-semibold mb-3">수익 현황판</h2>
-      <div id="calendar" class="text-sm"></div>
-      <div id="calendarList" class="mt-4 space-y-3"></div>
+      <div id="calendar"></div>
+      <!-- 일자별 리스트 및 메모 표시 영역 -->
+      <div id="calendarDetailArea" class="mt-4 p-3 bg-slate-50 rounded-xl hidden">
+        <div class="flex justify-between items-center mb-2">
+          <h3 id="selectedDateTitle" class="font-bold text-sm"></h3>
+          <button id="addDailyNoteBtn" class="text-[10px] bg-slate-800 text-white px-2 py-1 rounded">메모 작성</button>
+        </div>
+        <div id="dailyTradeList" class="space-y-2 mb-3"></div>
+        <div id="dailyNoteDisplay" class="text-xs text-slate-600 italic border-t pt-2"></div>
+      </div>
     </section>
 
-    <!-- DETAIL MODAL -->
+    <!-- 상세 모달 (1, 2번 반영) -->
     <div id="detailModal" class="modal-mask">
       <div class="modal-card">
-        <button id="detailClose" class="modal-close text-slate-400 hover:text-slate-600">✕</button>
-        <div id="detailContent" class="mt-4"></div>
+        <button id="detailClose" class="absolute top-3 right-4 text-xl">✕</button>
+        <div id="detailContent"></div>
       </div>
     </div>
 
-    <!-- DAY NOTE MODAL -->
-    <div id="noteModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
-      <div class="bg-white p-5 rounded-2xl w-full max-w-md relative shadow-2xl">
-        <button id="noteClose" class="absolute right-4 top-3 text-slate-400 text-2xl">✕</button>
-        <h3 class="text-lg font-bold mb-4 text-slate-800" id="noteDateLabel">일자 메모</h3>
-
-        <textarea id="noteText" class="input w-full mb-4 text-sm" rows="5"
-                  placeholder="오늘의 시장 특징주나 본인의 매매 심리를 기록하세요."></textarea>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <button id="noteImg1Btn" class="btn-secondary w-full text-xs py-2">📸 이미지 1</button>
-            <input type="file" id="noteImg1Input" accept="image/*" class="hidden">
-            <img id="noteImg1Preview" class="w-full mt-2 rounded-lg shadow-sm hidden cursor-pointer">
-          </div>
-          <div>
-            <button id="noteImg2Btn" class="btn-secondary w-full text-xs py-2">📸 이미지 2</button>
-            <input type="file" id="noteImg2Input" accept="image/*" class="hidden">
-            <img id="noteImg2Preview" class="w-full mt-2 rounded-lg shadow-sm hidden cursor-pointer">
-          </div>
+    <!-- 일자별 메모 모달 (8번 복구) -->
+    <div id="noteModal" class="modal-mask">
+      <div class="modal-card">
+        <h3 class="font-bold mb-3">일자별 코멘트</h3>
+        <textarea id="noteText" class="input h-32 text-sm" placeholder="지수 흐름이나 소감..."></textarea>
+        <div class="flex gap-2 mt-3">
+          <button id="saveNoteBtn" class="flex-1 py-2 bg-slate-800 text-white rounded-lg">메모 저장</button>
+          <button id="closeNoteBtn" class="px-4 py-2 bg-slate-100 rounded-lg">닫기</button>
         </div>
       </div>
     </div>
 
-    <!-- FULLSCREEN VIEWER -->
-    <div id="imgFullscreen" class="fixed inset-0 bg-black/95 hidden items-center justify-center z-[70] p-4 cursor-pointer">
-      <img id="imgFullscreenImg" class="max-w-full max-h-full object-contain shadow-2xl">
+    <!-- 전체화면 뷰어 (2번 반영) -->
+    <div id="imgFullscreen" class="fixed inset-0 bg-black hidden z-[100] items-center justify-center cursor-pointer">
+      <img id="imgFullscreenImg" class="max-w-full max-h-full">
     </div>
-
   </div>
 
   <script type="module" src="./app.js"></script>
