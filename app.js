@@ -404,9 +404,6 @@ function openDetail(t){
   const pnl = formatPnL(t);
   const r = rate(t);
   const buyAmount = calcBuyAmount(t);
-  const note = safeLocalGet('note:' + t.date);
-  const noteImg1 = safeLocalGet('noteImg1:' + t.date);
-  const noteImg2 = safeLocalGet('noteImg2:' + t.date);
 
   // (D, E) Hide views/fee-tax details, label "손익" only
   const html = `
@@ -444,17 +441,6 @@ function openDetail(t){
       <div class="detail-images" style="display:flex;gap:.75rem;">
         ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
         ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
-      </div>
-      <div style="grid-column: 1 / -1; margin-top:12px;">
-        <div class="text-slate-500 text-sm">일자 메모</div>
-        <div class="mt-1 p-2 rounded border border-slate-200 bg-slate-50 text-sm whitespace-pre-wrap">
-          ${note || '없음'}
-        </div>
-      </div>
-      
-      <div class="detail-images" style="display:flex; gap:.75rem;">
-        ${noteImg1 ? `<img src="${noteImg1}" class="detail-img" style="width:50%;">` : ''}
-        ${noteImg2 ? `<img src="${noteImg2}" class="detail-img" style="width:50%;">` : ''}
       </div>
     </div>`;
 
