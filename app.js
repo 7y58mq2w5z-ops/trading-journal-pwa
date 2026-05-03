@@ -87,20 +87,24 @@ function calcFeeTax(t){
 
 // (1) PnL includes fee/tax (buy+sell based)
 function formatPnL(t) {
-  return Number(t.realized_pnl || 0);
+  const qty = Number(t.qty || 0);
+  const buyPrice = Number(t.buy_price || 0);
+  const sellPrice = Number(t.sell_price || 0);
+
+  const grossPnL = (sellPrice - buyPrice) * qty;
+  const feeAndTax = calcFeeTax(t);
+
+  return grossPnL - feeAndTax;
 }
 
 // (C) Rate includes -0.23% fixed adjustment
 function rate(t) {
-  const buyAmount = calcBuyAmount(t);
-  if (!buyAmount) return 0;
+  const buy = Number(t.buy_price || 0);
+  const sell = Number(t.sell_price || 0);
+  if (!buy) return 0;
 
-  const pnl = Number(t.realized_pnl || 0);
-
-  // 수수료 (왕복 기준 유지)
-  const fee = buyAmount * FEE_RATE;
-
-  return ((pnl - fee) / buyAmount) * 100;
+  const gross = (sell / buy - 1) * 100;
+  return gross - 0.23;
 }
 
 function fmtDateNoYear(s){ if(!s) return ''; return s.slice(5); } // YYYY-MM-DD -> MM-DD
@@ -438,17 +442,6 @@ function openDetail(t){
         ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
         ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
       </div>
-      <div style="grid-column: 1 / -1; margin-top:10px;">
-        <div class="text-slate-500 text-sm">일자 메모</div>
-        <div class="mt-1 p-2 rounded border bg-slate-50 text-sm whitespace-pre-wrap">
-          ${note || '없음'}
-        </div>
-      </div>
-      
-      <div style="display:flex;gap:.75rem;">
-        ${noteImg1 ? `<img src="${noteImg1}" class="detail-img" style="width:50%;">` : ''}
-        ${noteImg2 ? `<img src="${noteImg2}" class="detail-img" style="width:50%;">` : ''}
-      </div> 
     </div>`;
 
   $('#detailContent').innerHTML = html;
@@ -519,12 +512,7 @@ function recomputeCalendarEvents(all) {
       title: fmtMan(Math.round(val)),
       start: d,
       allDay: true,
-    
-      // 🔥 핵심
-      backgroundColor: 'transparent',
-      borderColor: 'transparent',
-      textColor: val >= 0 ? '#dc2626' : '#2563eb',
-    
+      color: val >= 0 ? '#dc2626' : '#2563eb',
       extendedProps: { kind: 'daily', dateStr: d }
     });
   }
@@ -547,10 +535,7 @@ function recomputeCalendarEvents(all) {
         title: fmtMan(Math.round(sum)),
         start: saturday.toISOString().slice(0,10),
         allDay: true,
-      
-        backgroundColor: sum >= 0 ? '#dc2626' : '#2563eb',
-        textColor: '#ffffff',
-      
+        color: '#111827',
         extendedProps: { kind: 'weekly', weekStart: keyStart }
       });
     }
@@ -907,7 +892,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
       symbol: f.symbol.value.trim(),
       qty: Number(f.qty.value||0),
       buy_price: Number(f.buy_price.value||0),
-      realized_pnl: Number(f.realized_pnl.value||0),
+      sell_price: Number(f.sell_price.value||0),
       tags,
       comment: f.comment.value,
       image1: img1,
