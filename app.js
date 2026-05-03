@@ -536,8 +536,10 @@ function recomputeCalendarEvents(all) {
       title: fmtMan(Math.round(val)),
       start: d,
       allDay: true,
-      color: val >= 0 ? '#dc2626' : '#2563eb',
-      extendedProps: { kind: 'daily', dateStr: d }
+      // 배경색은 투명하게(또는 흰색), 글자색 제어를 위해 속성 추가
+      textColor: val >= 0 ? '#dc2626' : '#2563eb', 
+      color: 'transparent', // 배경색 제거
+      extendedProps: { kind: 'daily', dateStr: d, isPositive: val >= 0 }
     });
   }
 
@@ -559,7 +561,9 @@ function recomputeCalendarEvents(all) {
         title: fmtMan(Math.round(sum)),
         start: saturday.toISOString().slice(0,10),
         allDay: true,
-        color: '#111827',
+        // 주간 합계는 배경색 채움, 글자는 흰색
+        color: sum >= 0 ? '#dc2626' : '#2563eb', 
+        textColor: '#ffffff',
         extendedProps: { kind: 'weekly', weekStart: keyStart }
       });
     }
