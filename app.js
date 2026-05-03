@@ -947,14 +947,31 @@ window.addEventListener('beforeinstallprompt', (e)=>{
       created_at: prev ? prev.created_at : new Date().toISOString()
     };
 
-    if (payload.id) { await idbPut(payload); alert('수정 완료'); openDetail(payload); }
-    else { await idbAdd(payload); alert('저장 완료'); }
-
-    clearForm();
-    await populateMonthSelect();
-    await renderList();
-    await refreshCalendar();
-    if (!payload.id) switchTab('list');
+    if (payload.id) {
+      // 1. 데이터 업데이트
+      await idbPut(payload);
+      alert('수정 완료');
+    
+      // 2. 폼 초기화는 하되, 리스트 탭으로 강제 이동하지 않음
+      clearForm(); 
+    
+      // 3. 배경에 있는 리스트와 캘린더 데이터만 몰래 새로고침
+      await renderList();
+      await refreshCalendar();
+    
+      // 4. [핵심] 수정된 데이터(payload)를 가지고 상세창을 다시 띄움
+      // 이렇게 하면 리스트 탭 위에 상세창이 그대로 떠 있는 것처럼 보입니다.
+      openDetail(payload); 
+      
+    } else {
+      // 새로 입력하는 경우라면 이전처럼 리스트로 이동
+      await idbAdd(payload);
+      alert('저장 완료');
+      clearForm();
+      await renderList();
+      await refreshCalendar();
+      switchTab('list');
+    }
   });
 
   (document.getElementById('cancelBtn') || document.getElementById('resetForm'))?.addEventListener('click', () => {
