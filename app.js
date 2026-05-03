@@ -293,6 +293,9 @@ async function openDetailWithViewCount(id){
 // ---------- List render ----------
 let chart;
 async function renderList() {
+  // [추가] 리스트를 갱신하기 전의 현재 스크롤 위치를 기억합니다.
+  const scrollPos = window.scrollY;
+
   const q = $('#searchInput')?.value?.trim().toLowerCase() || '';
   const sortKey = $('#sortSelect')?.value || 'date_desc';
   const monthKey = $('#monthSelect') ? $('#monthSelect').value : 'all';
@@ -300,7 +303,7 @@ async function renderList() {
   const data = await idbAll();
 
   let rows = data.filter(t => {
-    const tagStr = (t.tags || '').toLowerCase(); // tags hidden from UI but searchable
+    const tagStr = (t.tags || '').toLowerCase();
     const sym = (t.symbol || '').toLowerCase();
     const okQuery = !q || tagStr.includes(q) || sym.includes(q);
     const okMonth = monthKey === 'all' || monthKeyOf(t.date) === monthKey;
@@ -315,7 +318,6 @@ async function renderList() {
     return 0;
   });
 
-  // (A) Make list fit without horizontal scroll: table-fixed + explicit widths + smaller padding
   const table = [`<table class="min-w-full table-fixed text-xs">
     <thead class="text-slate-500">
       <tr>
@@ -328,22 +330,17 @@ async function renderList() {
     </thead>
     <tbody>`];
 
-  // (B) alternate bg by day (more visible)
   let lastDate = null;
   let alt = false;
 
   for (const t of rows) {
     const pnl = formatPnL(t);
     const r = rate(t);
-
     const d = t.date || '';
     if (d !== lastDate) { alt = !alt; lastDate = d; }
     const rowBg = alt ? 'bg-slate-100' : 'bg-white';
-
-    // (B) Remove (종목수) next to date
     const dateCell = d ? `${fmtDateNoYear(d)}` : '';
 
-    // (3) highlight marker next to symbol
     const symbolHtml = (t.highlight)
       ? `<span class="inline-flex items-center gap-1 font-semibold max-w-full overflow-hidden">
            <span class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
@@ -365,6 +362,9 @@ async function renderList() {
   table.push(`</tbody></table>`);
   $('#listContainer').innerHTML = table.join('');
 
+  // [중요] 리스트를 화면에 그린 직후, 기억해둔 스크롤 위치로 즉시 이동합니다.
+  window.scrollTo(0, scrollPos);
+
   $('#listContainer').querySelectorAll('tr[data-id]').forEach(tr=>{
     tr.addEventListener('click', async ()=>{
       const id = Number(tr.getAttribute('data-id'));
@@ -372,7 +372,7 @@ async function renderList() {
     });
   });
 
-  // Chart (overall data)
+  // 차트 로직... (동일)
   const byDate = {};
   for (const t of data) if (t.date) byDate[t.date] = (byDate[t.date] || 0) + formatPnL(t);
   const days = Object.keys(byDate).sort();
@@ -948,30 +948,35 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     };
 
     if (payload.id) {
+          // 수정 전의 스크롤 위치를 한 번 더 변수에 담아둡니다.
+          const lastScrollY = window.scrollY;
+    
           await idbPut(payload);
           alert('수정 완료');
           
-          // 1. 폼 초기화 (내용만 비움)
           clearForm(); 
           
-          // 2. 데이터 갱신 (리스트 객체 정보만 업데이트)
-          await renderList();
+          // renderList 내부에서 이미 스크롤 복원 로직이 작동하지만, 
+          // 탭 전환과 겹칠 때를 대비해 순서를 조정합니다.
+          await renderList(); 
           await refreshCalendar();
           
-          // 3. [중요] 현재 탭이 'form'(입력창)일 때만 리스트로 이동시킵니다.
-          // 이미 리스트에서 편집을 누른 상태라면 굳이 switchTab을 부를 필요가 없습니다.
           const currentTab = document.querySelector('.tab-active')?.dataset.tab;
+          
           if (currentTab === 'form') {
+            // 입력창에서 수정 완료를 누른 경우 리스트로 보내되, 
+            // switchTab 실행 직후에 다시 스크롤 위치를 강제로 잡아줍니다.
             switchTab('list');
+            window.scrollTo(0, lastScrollY);
           }
-    
-          // 4. 보던 위치(리스트)를 유지한 채로 상세창만 다시 띄웁니다.
+          
+          // 상세창을 띄우기 전 스크롤이 튀지 않도록 0.05초의 여유를 줍니다.
           setTimeout(() => {
             openDetail(payload);
           }, 50);
     
         } else {
-          // 신규 입력은 이전과 동일
+          // 신규 입력 로직 (동일)
           await idbAdd(payload);
           alert('저장 완료');
           clearForm();
