@@ -948,30 +948,37 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     };
 
     if (payload.id) {
-      // 1. 데이터 업데이트
-      await idbPut(payload);
-      alert('수정 완료');
+          await idbPut(payload);
+          alert('수정 완료');
+          
+          // 1. 폼 초기화 (내용만 비움)
+          clearForm(); 
+          
+          // 2. 데이터 갱신 (리스트 객체 정보만 업데이트)
+          await renderList();
+          await refreshCalendar();
+          
+          // 3. [중요] 현재 탭이 'form'(입력창)일 때만 리스트로 이동시킵니다.
+          // 이미 리스트에서 편집을 누른 상태라면 굳이 switchTab을 부를 필요가 없습니다.
+          const currentTab = document.querySelector('.tab-active')?.dataset.tab;
+          if (currentTab === 'form') {
+            switchTab('list');
+          }
     
-      // 2. 폼 초기화는 하되, 리스트 탭으로 강제 이동하지 않음
-      clearForm(); 
+          // 4. 보던 위치(리스트)를 유지한 채로 상세창만 다시 띄웁니다.
+          setTimeout(() => {
+            openDetail(payload);
+          }, 50);
     
-      // 3. 배경에 있는 리스트와 캘린더 데이터만 몰래 새로고침
-      await renderList();
-      await refreshCalendar();
-    
-      // 4. [핵심] 수정된 데이터(payload)를 가지고 상세창을 다시 띄움
-      // 이렇게 하면 리스트 탭 위에 상세창이 그대로 떠 있는 것처럼 보입니다.
-      openDetail(payload); 
-      
-    } else {
-      // 새로 입력하는 경우라면 이전처럼 리스트로 이동
-      await idbAdd(payload);
-      alert('저장 완료');
-      clearForm();
-      await renderList();
-      await refreshCalendar();
-      switchTab('list');
-    }
+        } else {
+          // 신규 입력은 이전과 동일
+          await idbAdd(payload);
+          alert('저장 완료');
+          clearForm();
+          await renderList();
+          await refreshCalendar();
+          switchTab('list');
+        }
   });
 
   (document.getElementById('cancelBtn') || document.getElementById('resetForm'))?.addEventListener('click', () => {
