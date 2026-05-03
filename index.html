@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Trading Journal</title>
   <link rel="manifest" href="manifest33.json">
   <meta name="theme-color" content="#0f172a"/>
@@ -48,13 +48,26 @@
       background-color: rgba(59,130,246,0.16) !important; /* blue-500/15 */
       border-radius: 0.5rem;
     }
-    /* FullCalendar 기본 클릭 강조색(회색)을 투명하게 제거 */
-    .fc .fc-highlight {
-      background: transparent !important;
+    /* 입력창 포커스 시 자동 확대 방지 (줌 기능은 살려둠) */
+    input[type="text"], 
+    input[type="number"], 
+    input[type="date"], 
+    textarea, 
+    select {
+      font-size: 16px !important;
+      touch-action: manipulation; /* 두 번 탭해서 확대되는 동작 방지 */
     }
     /* 입력창 포커스 시 폰트 크기가 작으면 확대되므로 기본 크기를 16px로 맞춥니다 */
     .input, textarea {
       font-size: 16px !important;
+    }
+    /* 전체화면 이미지 뷰어 설정 */
+    #imgFullscreen img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      /* 전체화면 상태에서 손가락 줌이 가능하도록 설정 */
+      touch-action: pinch-zoom; 
     }
     /* 전체 화면 이미지 뷰어용 */
     #imgFullscreen { display: none; }
