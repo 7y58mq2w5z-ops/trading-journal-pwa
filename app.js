@@ -363,7 +363,9 @@ async function renderList() {
   $('#listContainer').innerHTML = table.join('');
 
   // [중요] 리스트를 화면에 그린 직후, 기억해둔 스크롤 위치로 즉시 이동합니다.
-  window.scrollTo(0, scrollPos);
+  requestAnimationFrame(() => {
+    window.scrollTo(0, scrollPos);
+  });
 
   $('#listContainer').querySelectorAll('tr[data-id]').forEach(tr=>{
     tr.addEventListener('click', async ()=>{
@@ -956,27 +958,33 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     };
 
     if (payload.id) {
-          const savedY = window.scrollY; // 현재 위치 저장
+          // [1] 현재 위치를 미리 저장
+          const targetScrollY = window.scrollY;
     
           await idbPut(payload);
-          alert('수정 완료');
           
-          // 1. 여기서 리스트를 먼저 그립니다. (스크롤 위치 복원 로직이 들어있는 버전)
+          // [2] 리스트 갱신 (위에서 수정한 requestAnimationFrame이 작동함)
           await renderList(); 
           await refreshCalendar();
           
-          // 2. 탭을 옮깁니다. (이제 switchTab 안의 renderList는 실행되지 않아 스크롤이 유지됨)
-          switchTab('list');
+          // [3] 현재 탭 확인 및 전환
+          const currentTab = document.querySelector('.tab-active')?.dataset.tab;
+          if (currentTab === 'form') {
+            switchTab('list');
+          }
+    
+          // [4] 다시 한번 강제 고정 (switchTab의 영향을 무력화)
+          window.scrollTo(0, targetScrollY);
           
-          // 3. 폼 초기화는 가장 마지막에 (isEditing 판별을 위해)
+          // [5] 폼 초기화
           clearForm(); 
     
-          // 4. 저장했던 위치로 다시 한번 고정
-          window.scrollTo(0, savedY);
-    
+          // [6] 상세창 띄우기 및 알림
           setTimeout(() => {
             openDetail(payload);
-          }, 50);
+            // 위치가 고정된 걸 확인한 후 알림을 띄우는 게 안전합니다.
+            console.log('수정 완료 - 위치 복원:', targetScrollY);
+          }, 100);
         }
   });
 
