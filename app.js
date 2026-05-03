@@ -843,10 +843,18 @@ function switchTab(name) {
   $$('.card').forEach(sec=>sec.classList.add('hidden'));
   $('#tab-' + name).classList.remove('hidden');
   $$('.tab-btn').forEach(btn=>btn.classList.remove('tab-active'));
+  
   const navBtn = document.querySelector(`[data-tab="${name}"]`);
   if (navBtn) navBtn.classList.add('tab-active');
+
   if (name === 'calendar') refreshCalendar();
-  if (name === 'list') renderList();
+  
+  // [수정] 수정 완료 후 상세창을 띄울 때는 이미 renderList를 호출했으므로,
+  // 여기서 또 호출하여 스크롤을 초기화하지 않도록 '수정 중'이 아닐 때만 실행하게 합니다.
+  const isEditing = !!$('#tradeForm').id.value; 
+  if (name === 'list' && !isEditing) {
+    renderList();
+  }
 }
 
 // ---------- Export/Import ----------
@@ -948,41 +956,27 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     };
 
     if (payload.id) {
-          // 수정 전의 스크롤 위치를 한 번 더 변수에 담아둡니다.
-          const lastScrollY = window.scrollY;
+          const savedY = window.scrollY; // 현재 위치 저장
     
           await idbPut(payload);
           alert('수정 완료');
           
-          clearForm(); 
-          
-          // renderList 내부에서 이미 스크롤 복원 로직이 작동하지만, 
-          // 탭 전환과 겹칠 때를 대비해 순서를 조정합니다.
+          // 1. 여기서 리스트를 먼저 그립니다. (스크롤 위치 복원 로직이 들어있는 버전)
           await renderList(); 
           await refreshCalendar();
           
-          const currentTab = document.querySelector('.tab-active')?.dataset.tab;
+          // 2. 탭을 옮깁니다. (이제 switchTab 안의 renderList는 실행되지 않아 스크롤이 유지됨)
+          switchTab('list');
           
-          if (currentTab === 'form') {
-            // 입력창에서 수정 완료를 누른 경우 리스트로 보내되, 
-            // switchTab 실행 직후에 다시 스크롤 위치를 강제로 잡아줍니다.
-            switchTab('list');
-            window.scrollTo(0, lastScrollY);
-          }
-          
-          // 상세창을 띄우기 전 스크롤이 튀지 않도록 0.05초의 여유를 줍니다.
+          // 3. 폼 초기화는 가장 마지막에 (isEditing 판별을 위해)
+          clearForm(); 
+    
+          // 4. 저장했던 위치로 다시 한번 고정
+          window.scrollTo(0, savedY);
+    
           setTimeout(() => {
             openDetail(payload);
           }, 50);
-    
-        } else {
-          // 신규 입력 로직 (동일)
-          await idbAdd(payload);
-          alert('저장 완료');
-          clearForm();
-          await renderList();
-          await refreshCalendar();
-          switchTab('list');
         }
   });
 
