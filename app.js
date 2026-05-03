@@ -444,8 +444,8 @@ function openDetail(t){
       <div class="text-slate-500 text-sm mb-2">📅 해당 일자 메모 & 이미지</div>
       <div class="p-3 bg-amber-50 rounded border border-amber-100 text-sm whitespace-pre-wrap">${dayMemo}</div>
       <div class="flex gap-2 mt-2">
-        ${dayImg1 ? `<img src="${dayImg1}" class="detail-img" style="width:100px; height:100px; object-fit:cover; border-radius:4px;">` : ''}
-        ${dayImg2 ? `<img src="${dayImg2}" class="detail-img" style="width:100px; height:100px; object-fit:cover; border-radius:4px;">` : ''}
+        ${dayImg1 ? `<img id="dayImg1" src="${dayImg1}" class="detail-img" style="width:100px; height:100px; object-fit:cover; border-radius:4px; cursor:zoom-in;">` : ''}
+        ${dayImg2 ? `<img id="dayImg2" src="${dayImg2}" class="detail-img" style="width:100px; height:100px; object-fit:cover; border-radius:4px; cursor:zoom-in;">` : ''}
       </div>
     </div>`;
 
@@ -468,6 +468,25 @@ function openDetail(t){
   }
   attachZoomHandler('img1'); attachZoomHandler('img2');
 
+  // 일자별 메모 이미지 1 클릭 이벤트
+  const di1 = document.getElementById('dayImg1');
+  if (di1) {
+    di1.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      const ok = await tryFullscreen(di1); // 전체화면 시도
+      if (!ok) toggleZoomFallback(di1);    // 실패 시 줌 브라우저 방식(fallback)
+    });
+  }
+  
+  // 일자별 메모 이미지 2 클릭 이벤트
+  const di2 = document.getElementById('dayImg2');
+  if (di2) {
+    di2.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      const ok = await tryFullscreen(di2);
+      if (!ok) toggleZoomFallback(di2);
+    });
+  }
   // ---- '편집' button below '닫기' ----
   const closeBtn = document.getElementById('detailClose');
   const modalCard = closeBtn?.closest('.modal-card');
