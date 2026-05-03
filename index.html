@@ -1,10 +1,11 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Trading Journal</title>
+  <title>Trading Journal Pro (Original Base)</title>
+  <link rel="manifest" href="manifest33.json">
+  <meta name="theme-color" content="#0f172a"/>
   <link rel="stylesheet" href="styles33.css">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet"/>
@@ -12,127 +13,143 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <style>
-    .modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); align-items: center; justify-content: center; z-index: 50; padding: 1rem; }
+    /* 캘린더 커스텀 스타일 (요청사항 3번 반영) */
+    .fc-day-sat { background-color: #f8fafc; }
+    .fc-day-sun { background-color: #fff1f2; }
+    
+    /* 평일 수익/손실 글자색 */
+    .pnl-plus-text { color: #dc2626 !important; font-weight: bold !important; }
+    .pnl-minus-text { color: #2563eb !important; font-weight: bold !important; }
+    
+    /* 토요일 주간 합계 음영 스타일 */
+    .weekly-sum-plus { background-color: #dc2626 !important; color: white !important; border-radius: 4px; padding: 1px 4px; font-weight: bold; }
+    .weekly-sum-minus { background-color: #2563eb !important; color: white !important; border-radius: 4px; padding: 1px 4px; font-weight: bold; }
+
+    /* 리스트 한 줄 유지 및 상세창 이미지 레이아웃 */
+    .list-row-single { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; overflow: hidden; }
+    .detail-img-grid { display: flex; gap: 8px; margin-top: 10px; }
+    .detail-img-item { flex: 1; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer; }
+
+    .modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
     .modal-mask.show { display: flex; }
-    .modal-card { background: #fff; border-radius: 1rem; padding: 1.25rem; max-width: 500px; width: 100%; position: relative; max-height: 90vh; overflow-y: auto; }
-    .tab-btn { padding: .6rem; border-radius: .75rem; background: #e5e7eb; font-weight: 500; }
-    .tab-active { background: #111827; color: #fff; }
-    .card { background: #fff; border-radius: 1rem; padding: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-    .input { border:1px solid #e2e8f0; border-radius:.5rem; padding:.5rem; width: 100%; outline: none; }
-    .input:focus { border-color: #3b82f6; }
-    .pnl-pos { color: #dc2626 !important; }
-    .pnl-neg { color: #2563eb !important; }
-    /* 리스트 한 줄 유지 */
-    .nowrap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    /* 이미지 수평 나열 */
-    .detail-images { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
-    .detail-img-wrapper { width: 50%; aspect-ratio: 16/9; overflow: hidden; border-radius: 0.5rem; border: 1px solid #f1f5f9; }
-    .detail-img-wrapper img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; }
+    .modal-card { background: white; width: 95%; max-width: 550px; border-radius: 20px; padding: 20px; max-height: 90vh; overflow-y: auto; position: relative; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
-  <div id="app" class="max-w-md mx-auto p-4 pb-20">
-    <header class="mb-4 text-center"><h1 class="text-xl font-bold">📈 My Trading Journal</h1></header>
+  <div id="app" class="max-w-md mx-auto min-h-screen flex flex-col relative pb-20">
+    
+    <header class="p-4 flex justify-between items-center bg-white border-b sticky top-0 z-30">
+      <h1 class="text-xl font-black italic tracking-tighter text-slate-800">TRADING LOG</h1>
+      <button id="installBtn" class="hidden bg-slate-900 text-white text-xs px-3 py-1.5 rounded-full font-bold">INSTALL APP</button>
+    </header>
 
-    <nav class="grid grid-cols-3 gap-2 sticky top-0 z-20 bg-slate-50 py-2 mb-4">
-      <button data-tab="form" class="tab-btn">입력</button>
-      <button data-tab="list" class="tab-btn tab-active">리스트</button>
-      <button data-tab="calendar" class="tab-btn">캘린더</button>
+    <nav class="flex p-2 bg-white gap-1 sticky top-[61px] z-30 border-b">
+      <button data-tab="form" class="tab-btn flex-1 py-3 rounded-xl font-bold text-sm transition-all bg-slate-100 text-slate-400">입력</button>
+      <button data-tab="list" class="tab-btn flex-1 py-3 rounded-xl font-bold text-sm transition-all bg-slate-900 text-white shadow-lg shadow-slate-200">리스트</button>
+      <button data-tab="calendar" class="tab-btn flex-1 py-3 rounded-xl font-bold text-sm transition-all bg-slate-100 text-slate-400">캘린더</button>
     </nav>
 
-    <!-- 입력 섹션 -->
-    <section id="tab-form" class="card hidden">
-      <form id="tradeForm" class="space-y-3">
-        <input type="hidden" name="id">
-        <!-- 4번: 날짜/종목명 수평 일렬 맞춤 -->
-        <div class="flex gap-2">
-          <div class="flex-1">
-            <label class="text-xs font-bold text-slate-500">날짜</label>
-            <input type="date" name="date" required class="input">
+    <main class="flex-1 p-4">
+      <!-- 입력 섹션 -->
+      <section id="tab-form" class="hidden space-y-4">
+        <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+          <form id="tradeForm" class="space-y-4">
+            <input type="hidden" name="id">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[10px] font-bold text-slate-400 ml-1 mb-1">DATE</label>
+                <input type="date" name="date" required class="w-full bg-slate-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-slate-900">
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-slate-400 ml-1 mb-1">SYMBOL</label>
+                <input type="text" name="symbol" required placeholder="종목명" class="w-full bg-slate-50 border-none rounded-xl p-3 text-sm focus:ring-2 focus:ring-slate-900">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="block text-[10px] font-bold text-slate-400 ml-1 mb-1">QTY</label>
+                <input type="number" name="qty" step="any" class="w-full bg-slate-50 border-none rounded-xl p-3 text-sm">
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-slate-400 ml-1 mb-1">BUY PRICE</label>
+                <input type="number" name="buy_price" step="any" class="w-full bg-slate-50 border-none rounded-xl p-3 text-sm">
+              </div>
+              <div>
+                <!-- 수정사항 1번: 실현손익 직접 입력 -->
+                <label class="block text-[10px] font-bold text-red-500 ml-1 mb-1">PROFIT/LOSS</label>
+                <input type="number" name="pnl_input" step="any" placeholder="직접입력" class="w-full bg-red-50 border-none rounded-xl p-3 text-sm text-red-600 font-bold">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 ml-1 mb-1">MEMO</label>
+              <textarea name="comment" rows="3" class="w-full bg-slate-50 border-none rounded-xl p-3 text-sm" placeholder="매매 전략 및 복기..."></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <label class="cursor-pointer bg-slate-100 p-3 rounded-xl text-center text-xs font-bold text-slate-600">
+                CHART 1
+                <input type="file" name="image1" accept="image/*" class="hidden">
+              </label>
+              <label class="cursor-pointer bg-slate-100 p-3 rounded-xl text-center text-xs font-bold text-slate-600">
+                CHART 2
+                <input type="file" name="image2" accept="image/*" class="hidden">
+              </label>
+            </div>
+
+            <div class="flex gap-2 pt-2">
+              <button type="submit" id="saveBtn" class="flex-1 bg-slate-900 text-white py-4 rounded-2xl font-bold shadow-xl shadow-slate-200">SAVE TRADE</button>
+              <button type="button" id="cancelBtn" class="px-6 bg-slate-100 text-slate-400 py-4 rounded-2xl font-bold">CANCEL</button>
+            </div>
+            <button type="button" id="deleteTrade" class="hidden w-full text-red-400 text-xs font-bold py-2">DELETE TRANSACTION</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- 리스트 섹션 -->
+      <section id="tab-list" class="space-y-4">
+        <div id="listContainer" class="space-y-2"></div>
+        <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+          <canvas id="pnlChart" height="150"></canvas>
+        </div>
+      </section>
+
+      <!-- 캘린더 섹션 -->
+      <section id="tab-calendar" class="hidden">
+        <div class="bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
+          <div id="calendar"></div>
+        </div>
+        <!-- 캘린더 하단 일자별 리스트/메모 영역 -->
+        <div id="calendarDetailArea" class="mt-4 p-4 bg-white rounded-3xl shadow-sm border border-slate-100 hidden">
+          <div class="flex justify-between items-center mb-4">
+            <h3 id="selectedDateTitle" class="font-bold text-slate-800"></h3>
+            <button id="addDailyNoteBtn" class="text-[10px] bg-slate-900 text-white px-3 py-1.5 rounded-full font-bold">DAILY MEMO</button>
           </div>
-          <div class="flex-1">
-            <label class="text-xs font-bold text-slate-500">종목명</label>
-            <input type="text" name="symbol" required class="input" placeholder="종목명">
-          </div>
+          <div id="dailyTradeList" class="space-y-2"></div>
+          <div id="dailyNoteDisplay" class="mt-4 p-4 bg-slate-50 rounded-2xl text-sm text-slate-600 italic"></div>
         </div>
+      </section>
+    </main>
 
-        <div class="grid grid-cols-3 gap-2">
-          <label class="text-xs font-bold text-slate-500">수량<input type="number" name="qty" class="input"></label>
-          <label class="text-xs font-bold text-slate-500">매수가<input type="number" name="buy_price" class="input"></label>
-          <label class="text-xs font-bold text-slate-500 text-red-500">실현손익<input type="number" name="pnl_input" class="input"></label>
-        </div>
-
-        <textarea name="comment" rows="3" class="input text-sm" placeholder="매매 복기..."></textarea>
-
-        <!-- 5번: 파일명 표시 기능 포함된 이미지 업로드 -->
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-center p-2 bg-slate-100 rounded-lg text-xs cursor-pointer border border-dashed border-slate-300">
-              이미지 1 선택
-              <input type="file" name="image1" class="hidden file-input" data-target="file-name-1">
-            </label>
-            <div id="file-name-1" class="text-[10px] text-slate-400 mt-1 truncate px-1">선택된 파일 없음</div>
-          </div>
-          <div>
-            <label class="block text-center p-2 bg-slate-100 rounded-lg text-xs cursor-pointer border border-dashed border-slate-300">
-              이미지 2 선택
-              <input type="file" name="image2" class="hidden file-input" data-target="file-name-2">
-            </label>
-            <div id="file-name-2" class="text-[10px] text-slate-400 mt-1 truncate px-1">선택된 파일 없음</div>
-          </div>
-        </div>
-
-        <div class="flex gap-2 pt-2">
-          <button type="submit" id="saveBtn" class="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold">저장하기</button>
-          <button type="button" id="cancelBtn" class="px-4 bg-slate-200 rounded-xl text-sm">취소</button>
-          <button type="button" id="deleteTrade" class="hidden px-4 bg-red-100 text-red-600 rounded-xl text-sm font-bold">삭제</button>
-        </div>
-      </form>
-    </section>
-
-    <!-- 리스트 섹션 -->
-    <section id="tab-list" class="card">
-      <div id="listContainer" class="overflow-hidden"></div>
-      <div class="mt-6"><canvas id="pnlChart" height="150"></canvas></div>
-    </section>
-
-    <!-- 캘린더 섹션 (8번 기능 복구) -->
-    <section id="tab-calendar" class="card hidden">
-      <div id="calendar"></div>
-      <!-- 일자별 리스트 및 메모 표시 영역 -->
-      <div id="calendarDetailArea" class="mt-4 p-3 bg-slate-50 rounded-xl hidden">
-        <div class="flex justify-between items-center mb-2">
-          <h3 id="selectedDateTitle" class="font-bold text-sm"></h3>
-          <button id="addDailyNoteBtn" class="text-[10px] bg-slate-800 text-white px-2 py-1 rounded">메모 작성</button>
-        </div>
-        <div id="dailyTradeList" class="space-y-2 mb-3"></div>
-        <div id="dailyNoteDisplay" class="text-xs text-slate-600 italic border-t pt-2"></div>
-      </div>
-    </section>
-
-    <!-- 상세 모달 (1, 2번 반영) -->
+    <!-- 상세 모달 -->
     <div id="detailModal" class="modal-mask">
       <div class="modal-card">
-        <button id="detailClose" class="absolute top-3 right-4 text-xl">✕</button>
+        <button id="detailClose" class="absolute top-5 right-5 text-slate-300 hover:text-slate-900 text-2xl">✕</button>
         <div id="detailContent"></div>
       </div>
     </div>
 
-    <!-- 일자별 메모 모달 (8번 복구) -->
+    <!-- 메모 모달 -->
     <div id="noteModal" class="modal-mask">
-      <div class="modal-card">
-        <h3 class="font-bold mb-3">일자별 코멘트</h3>
-        <textarea id="noteText" class="input h-32 text-sm" placeholder="지수 흐름이나 소감..."></textarea>
-        <div class="flex gap-2 mt-3">
-          <button id="saveNoteBtn" class="flex-1 py-2 bg-slate-800 text-white rounded-lg">메모 저장</button>
-          <button id="closeNoteBtn" class="px-4 py-2 bg-slate-100 rounded-lg">닫기</button>
+      <div class="modal-card !max-w-xs">
+        <h3 class="font-bold mb-4">일자별 메모</h3>
+        <textarea id="noteText" class="w-full bg-slate-50 border-none rounded-2xl p-4 text-sm h-40" placeholder="오늘의 시장 요약..."></textarea>
+        <div class="flex gap-2 mt-4">
+          <button id="saveNoteBtn" class="flex-1 bg-slate-900 text-white py-3 rounded-xl font-bold">저장</button>
+          <button id="closeNoteBtn" class="px-5 bg-slate-100 py-3 rounded-xl font-bold">닫기</button>
         </div>
       </div>
-    </div>
-
-    <!-- 전체화면 뷰어 (2번 반영) -->
-    <div id="imgFullscreen" class="fixed inset-0 bg-black hidden z-[100] items-center justify-center cursor-pointer">
-      <img id="imgFullscreenImg" class="max-w-full max-h-full">
     </div>
   </div>
 
