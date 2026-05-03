@@ -577,7 +577,7 @@ async function initCalendar() {
     initialView: 'dayGridMonth',
     height: 'auto',
     locale: 'ko',
-    dayCellDidMount: (arg)=>{
+    dayCellDidMount: (arg) => {
       const d = arg.date.getDay();
       if (d === 0) { arg.el.style.color = '#dc2626'; }
       if (d === 6) { arg.el.style.color = '#2563eb'; }
@@ -587,7 +587,24 @@ async function initCalendar() {
       const ep = info.event.extendedProps || {};
       if (ep.kind === 'daily' && ep.dateStr) await renderCalendarList(ep.dateStr);
       else if (ep.kind === 'weekly' && ep.weekStart) await renderWeekList(ep.weekStart);
+    }, // <--- 여기에 쉼표(,)가 있어야 합니다.
+
+    // --- 여기서부터 추가되는 스타일 설정입니다 ---
+    eventDidMount: function(info) {
+      // 1. 평일(일별) 손익 글자 스타일
+      if (info.event.extendedProps.kind === 'daily') {
+        info.el.style.fontWeight = 'bold'; // 글자 두껍게
+        info.el.style.border = 'none';     // 테두리 제거 (투명 배경용)
+        info.el.style.textAlign = 'center';
+      }
+      // 2. 토요일(주간) 합계 배경 스타일
+      if (info.event.extendedProps.kind === 'weekly') {
+        info.el.style.borderRadius = '4px'; // 배경 둥글게
+        info.el.style.padding = '2px';      // 안쪽 여백
+        info.el.style.textAlign = 'center';
+      }
     }
+    // --- 추가 끝 ---
   });
   calendar.render();
   await refreshCalendar();
