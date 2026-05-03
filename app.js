@@ -439,10 +439,6 @@ function openDetail(t){
         ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
       </div>
     </div>
-    <div class="detail-images" style="display:flex;gap:.75rem;">
-      ${t.image1?`<img id="img1" src="${t.image1}" class="detail-img" style="width:50%;">`:''}
-      ${t.image2?`<img id="img2" src="${t.image2}" class="detail-img" style="width:50%;">`:''}
-    </div>
     <hr class="my-4 border-slate-200">
     <div class="mt-4">
       <div class="text-slate-500 text-sm mb-2">📅 해당 일자 메모 & 이미지</div>
