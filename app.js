@@ -512,7 +512,7 @@ function recomputeCalendarEvents(all) {
       title: fmtMan(Math.round(val)),
       start: d,
       allDay: true,
-      textColor: val >= 0 ? '#dc2626' : '#2563eb',
+      color: val >= 0 ? '#dc2626' : '#2563eb',
       extendedProps: { kind: 'daily', dateStr: d }
     });
   }
@@ -535,7 +535,7 @@ function recomputeCalendarEvents(all) {
         title: fmtMan(Math.round(sum)),
         start: saturday.toISOString().slice(0,10),
         allDay: true,
-        color: val >= 0 ? '#dc2626' : '#2563eb',
+        color: '#111827',
         extendedProps: { kind: 'weekly', weekStart: keyStart }
       });
     }
