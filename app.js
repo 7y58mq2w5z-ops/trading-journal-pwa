@@ -457,8 +457,6 @@ function openDetail(t){
         ${noteImg2 ? `<img src="${noteImg2}" class="detail-img" style="width:50%;">` : ''}
       </div>
     </div>`;
-  ${noteImg1 ? `<img id="noteImg1" src="${noteImg1}" class="detail-img" style="width:50%;">` : ''}
-  ${noteImg2 ? `<img id="noteImg2" src="${noteImg2}" class="detail-img" style="width:50%;">` : ''}
 
   $('#detailContent').innerHTML = html;
   const c = document.getElementById('detailComment');
