@@ -220,7 +220,7 @@ function fillForm(t) {
   form.symbol.value = t.symbol || '';
   form.qty.value = t.qty ?? '';
   form.buy_price.value = t.buy_price ?? '';
-  form.sell_price.value = t.sell_price ?? '';
+  if (form.pnl_val) form.pnl_val.value = t.pnl_val ?? '';
   form.comment.value = t.comment || '';
   if (form.highlight) form.highlight.checked = !!t.highlight;
 
