@@ -45,9 +45,7 @@
 
     /* 1. 모든 상태(기본, 호버, 클릭, 포커스)에서 배경색 강제 제거 */
     .fc-event, 
-    .fc-event-main, 
     .fc-daygrid-event,
-    .fc-daygrid-event-harness,
     .fc-event:focus, 
     .fc-event:active,
     .fc-event-selected,
@@ -63,6 +61,19 @@
     .fc-event::before,
     .fc-event::after {
       display: none !important;
+    }
+ 
+    /* 주간 합계 및 일별 금액 텍스트가 강제로 투명해지는 것 방지 */
+    .fc-event-main, .fc-event-title {
+      color: inherit !important; /* 원래 설정된 색상(빨강/파랑) 유지 */
+      opacity: 1 !important;
+      display: block !important;
+      visibility: visible !important;
+    }
+    
+    /* 주간 합계 행(Row)의 배경색이 겹치지 않게 설정 */
+    .fc-daygrid-event-harness {
+      background: none !important;
     }
     
     /* 3. 금액 텍스트가 클릭 시 사라지지 않도록 보장 */
