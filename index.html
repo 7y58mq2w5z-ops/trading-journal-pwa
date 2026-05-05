@@ -43,40 +43,34 @@
     .detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap: .75rem; }
     .detail-images { grid-column: 1 / -1; display:flex; gap:.75rem; }
 
-    /* 1. 모든 상태(기본, 호버, 클릭, 포커스)에서 배경색 강제 제거 */
-    .fc-event, 
-    .fc-event-main, 
-    .fc-daygrid-event,
-    .fc-daygrid-event-harness,
-    .fc-event:focus, 
-    .fc-event:active,
-    .fc-event-selected,
-    .fc-event-dragging {
-      /*background-color: transparent !important;
-      background: transparent !important;*/
+    /* 월~금 평일 칸(.fc-day-mon ~ .fc-day-fri) 내부의 이벤트에만 적용 */
+    .fc-day-mon .fc-event, .fc-day-mon .fc-event-main, .fc-day-mon .fc-daygrid-event-harness,
+    .fc-day-tue .fc-event, .fc-day-tue .fc-event-main, .fc-day-tue .fc-daygrid-event-harness,
+    .fc-day-wed .fc-event, .fc-day-wed .fc-event-main, .fc-day-wed .fc-daygrid-event-harness,
+    .fc-day-thu .fc-event, .fc-day-thu .fc-event-main, .fc-day-thu .fc-daygrid-event-harness,
+    .fc-day-fri .fc-event, .fc-day-fri .fc-event-main, .fc-day-fri .fc-daygrid-event-harness {
+      background-color: transparent !important;
+      background: transparent !important;
       border: none !important;
       box-shadow: none !important;
       outline: none !important;
-      -webkit-tap-highlight-color: transparent !important; /* 모바일 터치 시 하이라이트 제거 */
+      -webkit-tap-highlight-color: transparent !important; /* 평일 터치 하이라이트 제거 */
     }
-    /* 2. 클릭 시 생기는 반투명한 검정색/회색 덮개(Overlay) 제거 */
-    .fc-event::before,
-    .fc-event::after {
+    
+    /* 월~금 평일 이벤트 클릭 시 생기는 Overlay(덮개) 제거 */
+    .fc-day-mon .fc-event::before, .fc-day-mon .fc-event::after,
+    .fc-day-tue .fc-event::before, .fc-day-tue .fc-event::after,
+    .fc-day-wed .fc-event::before, .fc-day-wed .fc-event::after,
+    .fc-day-thu .fc-event::before, .fc-day-thu .fc-event::after,
+    .fc-day-fri .fc-event::before, .fc-day-fri .fc-event::after {
       display: none !important;
     }
- 
-
-    /* 3. 금액 텍스트가 클릭 시 사라지지 않도록 보장 */
+    
+    /* 모든 이벤트 메인 텍스트 보장 (공통) */
     .fc-event-main {
       opacity: 1 !important;
       position: relative;
       z-index: 2;
-    }
-
-    /* 이벤트 내부 텍스트 정렬 (선택 사항) */
-    .fc-event-main {
-      text-align: center !important;
-      width: 100%;
     }
     
     /* 3. 날짜 박스만 콕 집어서 너비 줄이기 */
