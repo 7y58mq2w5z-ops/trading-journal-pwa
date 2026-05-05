@@ -50,11 +50,11 @@
     .fc-event:active,
     .fc-event-selected,
     .fc-event-dragging {
-      background-color: transparent !important;
+      /*background-color: transparent !important;
       background: transparent !important;
       border: none !important;
       box-shadow: none !important;
-      outline: none !important;
+      outline: none !important;*/
       -webkit-tap-highlight-color: transparent !important; /* 모바일 터치 시 하이라이트 제거 */
     }
     /* 2. 클릭 시 생기는 반투명한 검정색/회색 덮개(Overlay) 제거 */
@@ -63,19 +63,7 @@
       display: none !important;
     }
  
-    /* 주간 합계 및 일별 금액 텍스트가 강제로 투명해지는 것 방지 */
-    .fc-event-main, .fc-event-title {
-      color: inherit !important; /* 원래 설정된 색상(빨강/파랑) 유지 */
-      opacity: 1 !important;
-      display: block !important;
-      visibility: visible !important;
-    }
-    
-    /* 주간 합계 행(Row)의 배경색이 겹치지 않게 설정 */
-    .fc-daygrid-event-harness {
-      background: none !important;
-    }
-    
+
     /* 3. 금액 텍스트가 클릭 시 사라지지 않도록 보장 */
     .fc-event-main {
       opacity: 1 !important;
@@ -91,8 +79,8 @@
     
     /* 3. 날짜 박스만 콕 집어서 너비 줄이기 */
     input[type="date"].input {
-      width: 330px;
-      height: 32px;
+      width: 328px;
+      height: 40px;
       flex: none;
     } 
     /* 선택된 캘린더 날짜 강조용 (JS에서 클래스만 붙여주면 됨) */
@@ -132,7 +120,7 @@
      <div class="flex items-baseline gap-2">
       <h1 class="text-xl font-bold">매매일지</h1>
       <!-- 아래 span 태그의 숫자를 수정할 때마다 직접 올리시면 됩니다 -->
-      <span class="text-xs font-medium text-slate-400 bg-slate-200/50 px-2 py-0.5 rounded-full">ver 2.0</span>
+      <span class="text-xs font-medium text-slate-400 bg-slate-200/50 px-2 py-0.5 rounded-full">ver 2.1</span>
      </div>
       <button id="installBtn" class="px-3 py-2 rounded-xl bg-emerald-600 text-white hidden">홈 화면에 추가</button>
     </header>
