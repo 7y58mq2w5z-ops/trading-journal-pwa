@@ -926,66 +926,65 @@ window.addEventListener('beforeinstallprompt', (e)=>{
     if (e.target.files && e.target.files[0]) importJSON(e.target.files[0]);
   });
 
-  $('#tradeForm').addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const f = e.target;
-
-    let prev = null;
-    const editId = f.id.value ? Number(f.id.value) : null;
-    if (editId) prev = await idbGet(editId);
-
-    const newImg1 = await compressFileToDataURL(f.image1.files[0], {maxSide:2000, quality:0.85});
-    const newImg2 = await compressFileToDataURL(f.image2.files[0], {maxSide:2000, quality:0.85});
-    const img1 = newImg1 || (prev ? prev.image1 : null);
-    const img2 = newImg2 || (prev ? prev.image2 : null);
-
-    const tags = Array.from(document.querySelectorAll('input[name="tags[]"]:checked')).map(x=>x.value).join(',');
-
-    const payload = {
-      id: editId || undefined,
-      date: f.date.value,
-      symbol: f.symbol.value.trim(),
-      qty: Number(f.qty.value||0),
-      buy_price: Number(f.buy_price.value||0),
-      pnl_val: Number(f.pnl_val.value||0),
-      tags,
-      comment: f.comment.value,
-      image1: img1,
-      image2: img2,
-      highlight: !!(f.highlight && f.highlight.checked),
-      views: prev ? Number(prev.views || 0) : 0,
-      created_at: prev ? prev.created_at : new Date().toISOString()
-    };
-
-    if (payload.id) {
-          // [1] 현재 위치를 미리 저장
-          const targetScrollY = window.scrollY;
-    
-          await idbPut(payload);
-          
-          // [2] 리스트 갱신 (위에서 수정한 requestAnimationFrame이 작동함)
-          await renderList(); 
-          await refreshCalendar();
-          
-          // [3] 현재 탭 확인 및 전환
-          const currentTab = document.querySelector('.tab-active')?.dataset.tab;
-          if (currentTab === 'form') {
-            switchTab('list');
+  $('#tradeForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      
+      try {
+          let prev = null;
+          const editId = f.id.value ? Number(f.id.value) : null;
+          if (editId) prev = await idbGet(editId);
+  
+          // 이미지 처리
+          const newImg1 = await compressFileToDataURL(f.image1.files[0], {maxSide:2000, quality:0.85});
+          const newImg2 = await compressFileToDataURL(f.image2.files[0], {maxSide:2000, quality:0.85});
+          const img1 = newImg1 || (prev ? prev.image1 : null);
+          const img2 = newImg2 || (prev ? prev.image2 : null);
+  
+          const tags = Array.from(document.querySelectorAll('input[name="tags[]"]:checked')).map(x=>x.value).join(',');
+  
+          const payload = {
+              id: editId || undefined,
+              date: f.date.value,
+              symbol: f.symbol.value.trim(),
+              qty: Number(f.qty.value||0),
+              buy_price: Number(f.buy_price.value||0),
+              pnl_val: Number(f.pnl_val.value||0), // 수동 입력값 우선 사용
+              tags,
+              comment: f.comment.value,
+              image1: img1,
+              image2: img2,
+              highlight: !!(f.highlight && f.highlight.checked),
+              views: prev ? Number(prev.views || 0) : 0,
+              created_at: prev ? prev.created_at : new Date().toISOString()
+          };
+  
+          if (payload.id) {
+              // [수정 모드]
+              const targetScrollY = window.scrollY;
+              await idbPut(payload);
+              await renderList();
+              await refreshCalendar();
+              
+              if (document.querySelector('.tab-active')?.dataset.tab === 'form') {
+                  switchTab('list');
+              }
+              window.scrollTo(0, targetScrollY);
+              clearForm();
+              setTimeout(() => openDetail(payload), 100);
+          } else {
+              // [신규 저장 모드] - 이 부분이 추가되어야 저장이 됩니다!
+              await idbAdd(payload);
+              await renderList();
+              await refreshCalendar();
+              clearForm();
+              switchTab('list');
+              alert('저장 완료되었습니다.');
           }
-    
-          // [4] 다시 한번 강제 고정 (switchTab의 영향을 무력화)
-          window.scrollTo(0, targetScrollY);
-          
-          // [5] 폼 초기화
-          clearForm(); 
-    
-          // [6] 상세창 띄우기 및 알림
-          setTimeout(() => {
-            openDetail(payload);
-            // 위치가 고정된 걸 확인한 후 알림을 띄우는 게 안전합니다.
-            console.log('수정 완료 - 위치 복원:', targetScrollY);
-          }, 100);
-        }
+      } catch (err) {
+          console.error("저장 중 오류 발생:", err);
+          alert("저장에 실패했습니다. 콘솔 창을 확인해 주세요.");
+      }
   });
 
   (document.getElementById('cancelBtn') || document.getElementById('resetForm'))?.addEventListener('click', () => {
