@@ -97,6 +97,7 @@
     .input, textarea {
       font-size: 16px !important;
     }
+
     /* 전체화면 이미지 뷰어 설정 */
     #imgFullscreen img {
       max-width: 100%;
@@ -108,6 +109,10 @@
     /* 전체 화면 이미지 뷰어용 */
     #imgFullscreen { display: none; }
     #imgFullscreen.show { display: flex; }
+    #tab-list {
+      /* 리스트가 적어도 스크롤 위치를 유지할 수 있게 충분한 바닥 공간 확보 */
+      padding-bottom: 80vh !important; 
+    } 
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
