@@ -990,7 +990,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
               }, 150); 
           
           }
-          } else {
+          else {
               // [신규 저장 모드] - 이 부분이 추가되어야 저장이 됩니다!
               await idbAdd(payload);
               await renderList();
