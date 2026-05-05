@@ -960,18 +960,36 @@ window.addEventListener('beforeinstallprompt', (e)=>{
           };
   
           if (payload.id) {
-              // [수정 모드]
+              // 1. 현재 위치 저장
               const targetScrollY = window.scrollY;
+              
+              // 2. DB 업데이트 및 데이터 로드
               await idbPut(payload);
               await renderList();
               await refreshCalendar();
-              
+          
+              // 3. 탭 전환 (여기서 높이가 변함)
               if (document.querySelector('.tab-active')?.dataset.tab === 'form') {
                   switchTab('list');
               }
-              window.scrollTo(0, targetScrollY);
+          
+              // 4. 폼 초기화
               clearForm();
-              setTimeout(() => openDetail(payload), 100);
+          
+              // 5. ★ 핵심: 0.1~0.2초 정도 기다린 뒤 스크롤 복구 및 상세창 열기
+              // 브라우저가 리스트를 다 그릴 시간을 주는 것입니다.
+              setTimeout(() => {
+                  window.scrollTo({
+                      top: targetScrollY,
+                      behavior: 'instant' // 부드럽게 말고 즉시 이동
+                  });
+                  openDetail(payload);
+                  
+                  // 알림은 모든 이동이 끝난 뒤에 띄우는 것이 UX상 더 깔끔합니다.
+                  console.log('수정 완료 및 스크롤 복구 완료');
+              }, 150); 
+          
+          }
           } else {
               // [신규 저장 모드] - 이 부분이 추가되어야 저장이 됩니다!
               await idbAdd(payload);
