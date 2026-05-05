@@ -60,7 +60,31 @@
       text-align: center !important;
       width: 100%;
     }
-
+    /* 1. 라벨과 입력창 사이의 과한 간격 제거 및 정렬 */
+    .label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px; /* 글자와 입력창 사이 간격 최소화 */
+      align-items: flex-start;
+      margin-bottom: 8px;
+      font-size: 0.875rem; /* 라벨 글자 크기 살짝 조정 */
+      color: #475569;
+    }
+    
+    /* 2. 입력창 높이 통일 및 날짜 박스 너비 조절 */
+    .input {
+      width: 100%;
+      height: 42px; /* 모든 입력창 높이 통일 */
+      padding: 8px 12px !important;
+      box-sizing: border-box;
+    }
+    
+    /* 3. 날짜 박스만 콕 집어서 너비 줄이기 */
+    input[type="date"].input {
+      width: 160px !important; /* 종목명보다 짧게 설정 */
+      min-height: 42px;
+      flex: none;
+    } 
     /* 선택된 캘린더 날짜 강조용 (JS에서 클래스만 붙여주면 됨) */
     .cal-selected-day {
       background-color: rgba(59,130,246,0.16) !important; /* blue-500/15 */
