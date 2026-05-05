@@ -42,6 +42,24 @@
     .detail-img { border-radius:.75rem; box-shadow: 0 2px 8px rgba(0,0,0,.08); max-height:60vh; width:100%; object-fit:contain; cursor: zoom-in; }
     .detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap: .75rem; }
     .detail-images { grid-column: 1 / -1; display:flex; gap:.75rem; }
+    /* 캘린더 금액 박스의 회색 배경과 테두리 제거 */
+    .fc-v-event, .fc-h-event, .fc-event {
+      background-color: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+    
+    /* 금액 클릭 시 생기는 강조 효과도 투명하게 처리 */
+    .fc-event:focus, .fc-event:active {
+      background-color: transparent !important;
+      outline: none !important;
+    }
+
+    /* 이벤트 내부 텍스트 정렬 (선택 사항) */
+    .fc-event-main {
+      text-align: center !important;
+      width: 100%;
+    }
 
     /* 선택된 캘린더 날짜 강조용 (JS에서 클래스만 붙여주면 됨) */
     .cal-selected-day {
@@ -80,7 +98,7 @@
      <div class="flex items-baseline gap-2">
       <h1 class="text-xl font-bold">매매일지</h1>
       <!-- 아래 span 태그의 숫자를 수정할 때마다 직접 올리시면 됩니다 -->
-      <span class="text-xs font-medium text-slate-400 bg-slate-200/50 px-2 py-0.5 rounded-full">ver 1.5</span>
+      <span class="text-xs font-medium text-slate-400 bg-slate-200/50 px-2 py-0.5 rounded-full">ver 1.6</span>
      </div>
       <button id="installBtn" class="px-3 py-2 rounded-xl bg-emerald-600 text-white hidden">홈 화면에 추가</button>
     </header>
