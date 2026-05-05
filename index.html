@@ -59,7 +59,18 @@
       outline: none !important;
       -webkit-tap-highlight-color: transparent !important; /* 모바일 터치 시 하이라이트 제거 */
     }
-
+    /* 2. 클릭 시 생기는 반투명한 검정색/회색 덮개(Overlay) 제거 */
+    .fc-event::before,
+    .fc-event::after {
+      display: none !important;
+    }
+    
+    /* 3. 금액 텍스트가 클릭 시 사라지지 않도록 보장 */
+    .fc-event-main {
+      opacity: 1 !important;
+      position: relative;
+      z-index: 2;
+    }
 
     /* 이벤트 내부 텍스트 정렬 (선택 사항) */
     .fc-event-main {
