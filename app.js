@@ -963,38 +963,38 @@ window.addEventListener('beforeinstallprompt', (e)=>{
               // 1. 현재 위치 저장
               const targetScrollY = window.scrollY;
               
-              // 2. DB 업데이트 및 데이터 로드 (렌더링 준비)
+              // 2. 데이터 처리 및 화면 갱신
               await idbPut(payload);
               await renderList();
               await refreshCalendar();
           
-              // 3. 탭 전환 및 폼 비우기
+              // 3. 탭 전환 및 폼 초기화
               if (document.querySelector('.tab-active')?.dataset.tab === 'form') {
                   switchTab('list');
               }
               clearForm();
           
-              // 4. 스크롤 복구 로직 보완
-              // 지연 시간을 200ms로 약간 늘리고, 복구 후 알림을 띄웁니다.
+              // 4. 스크롤 복구 (지연 시간 후 실행)
               setTimeout(() => {
-                  // 리스트 탭의 높이가 순간적으로 짧을 수 있으므로 
-                  // 강제로 높이를 확보한 뒤 이동하면 더 정확합니다.
-                  document.getElementById('tab-list').style.minHeight = (targetScrollY + window.innerHeight) + 'px';
+                  // 높이 확보를 위해 리스트 탭에 임시로 큰 높이 부여
+                  const listTab = document.getElementById('tab-list');
+                  const originalMinHeight = listTab.style.minHeight;
+                  listTab.style.minHeight = '200vh'; 
 
                   window.scrollTo({
                       top: targetScrollY,
                       behavior: 'instant'
                   });
+
+                  // 5. 스크롤 이동이 끝난 뒤에 상세창 열기 및 알림
+                  setTimeout(() => {
+                      openDetail(payload);
+                      // alert이 스크롤을 방해하지 않도록 마지막에 배치
+                      alert('수정이 완료되었습니다.');
+                      listTab.style.minHeight = originalMinHeight;
+                  }, 50); 
                   
-                  openDetail(payload);
-                  
-                  // 콘솔이 아닌 실제 알림창을 띄웁니다.
-                  alert('수정이 완료되었습니다.');
-                  
-                  // 작업 완료 후 임시로 늘린 높이 제거
-                  document.getElementById('tab-list').style.minHeight = '';
-              }, 200); 
-          
+              }, 150); 
           }
           else {
               // [신규 저장 모드] - 이 부분이 추가되어야 저장이 됩니다!
