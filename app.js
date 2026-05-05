@@ -963,31 +963,37 @@ window.addEventListener('beforeinstallprompt', (e)=>{
               // 1. 현재 위치 저장
               const targetScrollY = window.scrollY;
               
-              // 2. DB 업데이트 및 데이터 로드
+              // 2. DB 업데이트 및 데이터 로드 (렌더링 준비)
               await idbPut(payload);
               await renderList();
               await refreshCalendar();
           
-              // 3. 탭 전환 (여기서 높이가 변함)
+              // 3. 탭 전환 및 폼 비우기
               if (document.querySelector('.tab-active')?.dataset.tab === 'form') {
                   switchTab('list');
               }
-          
-              // 4. 폼 초기화
               clearForm();
           
-              // 5. ★ 핵심: 0.1~0.2초 정도 기다린 뒤 스크롤 복구 및 상세창 열기
-              // 브라우저가 리스트를 다 그릴 시간을 주는 것입니다.
+              // 4. 스크롤 복구 로직 보완
+              // 지연 시간을 200ms로 약간 늘리고, 복구 후 알림을 띄웁니다.
               setTimeout(() => {
+                  // 리스트 탭의 높이가 순간적으로 짧을 수 있으므로 
+                  // 강제로 높이를 확보한 뒤 이동하면 더 정확합니다.
+                  document.getElementById('tab-list').style.minHeight = (targetScrollY + window.innerHeight) + 'px';
+
                   window.scrollTo({
                       top: targetScrollY,
-                      behavior: 'instant' // 부드럽게 말고 즉시 이동
+                      behavior: 'instant'
                   });
+                  
                   openDetail(payload);
                   
-                  // 알림은 모든 이동이 끝난 뒤에 띄우는 것이 UX상 더 깔끔합니다.
-                  console.log('수정 완료');
-              }, 150); 
+                  // 콘솔이 아닌 실제 알림창을 띄웁니다.
+                  alert('수정이 완료되었습니다.');
+                  
+                  // 작업 완료 후 임시로 늘린 높이 제거
+                  document.getElementById('tab-list').style.minHeight = '';
+              }, 200); 
           
           }
           else {
