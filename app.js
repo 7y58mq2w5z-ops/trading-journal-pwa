@@ -986,7 +986,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
                   openDetail(payload);
                   
                   // 알림은 모든 이동이 끝난 뒤에 띄우는 것이 UX상 더 깔끔합니다.
-                  console.log('수정 완료 및 스크롤 복구 완료');
+                  console.log('수정 완료');
               }, 150); 
           
           }
@@ -997,7 +997,7 @@ window.addEventListener('beforeinstallprompt', (e)=>{
               await refreshCalendar();
               clearForm();
               switchTab('list');
-              alert('저장 완료되었습니다.');
+              alert('저장 완료');
           }
       } catch (err) {
           console.error("저장 중 오류 발생:", err);
