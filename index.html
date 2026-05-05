@@ -45,7 +45,9 @@
 
     /* 1. 모든 상태(기본, 호버, 클릭, 포커스)에서 배경색 강제 제거 */
     .fc-event, 
+    .fc-event-main, 
     .fc-daygrid-event,
+    .fc-daygrid-event-harness,
     .fc-event:focus, 
     .fc-event:active,
     .fc-event-selected,
@@ -80,7 +82,7 @@
     /* 3. 날짜 박스만 콕 집어서 너비 줄이기 */
     input[type="date"].input {
       width: 328px;
-      height: 40px;
+      height: 42px;
       flex: none;
     } 
     /* 선택된 캘린더 날짜 강조용 (JS에서 클래스만 붙여주면 됨) */
@@ -120,7 +122,7 @@
      <div class="flex items-baseline gap-2">
       <h1 class="text-xl font-bold">매매일지</h1>
       <!-- 아래 span 태그의 숫자를 수정할 때마다 직접 올리시면 됩니다 -->
-      <span class="text-xs font-medium text-slate-400 bg-slate-200/50 px-2 py-0.5 rounded-full">ver 2.1</span>
+      <span class="text-xs font-medium text-slate-400 bg-slate-200/50 px-2 py-0.5 rounded-full">ver 2.2</span>
      </div>
       <button id="installBtn" class="px-3 py-2 rounded-xl bg-emerald-600 text-white hidden">홈 화면에 추가</button>
     </header>
