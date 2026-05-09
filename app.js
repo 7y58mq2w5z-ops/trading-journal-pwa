@@ -960,41 +960,36 @@ window.addEventListener('beforeinstallprompt', (e)=>{
           };
   
           if (payload.id) {
-              // 1. 현재 위치 저장
-              const targetScrollY = window.scrollY;
-              
-              // 2. 데이터 처리 및 화면 갱신
+              // 1. 데이터 업데이트 (DB 저장)
               await idbPut(payload);
+              
+              // 2. [변경] 화면 전환 전, 폼이 유지된 상태에서 알림창을 먼저 띄움
+              // 사용자가 '확인'을 누를 때까지 코드가 여기서 멈춥니다.
+              alert('수정이 완료되었습니다.');
+
+              // 3. 알림창을 닫은 후 작업 시작
+              const targetScrollY = window.scrollY; // 필요하다면 저장
+              
+              // 4. 화면 데이터 갱신
               await renderList();
               await refreshCalendar();
-          
-              // 3. 탭 전환 및 폼 초기화
+
+              // 5. 탭 전환 및 폼 초기화 (이제 화면이 바뀝니다)
               if (document.querySelector('.tab-active')?.dataset.tab === 'form') {
                   switchTab('list');
               }
               clearForm();
-          
-              // 4. 스크롤 복구 (지연 시간 후 실행)
-              setTimeout(() => {
-                  // 높이 확보를 위해 리스트 탭에 임시로 큰 높이 부여
-                  const listTab = document.getElementById('tab-list');
-                  const originalMinHeight = listTab.style.minHeight;
-                  listTab.style.minHeight = '200vh'; 
 
+              // 6. 상세 정보창 출력 (약간의 지연을 주어 리스트 렌더링 후 안정적으로 실행)
+              setTimeout(() => {
+                  openDetail(payload);
+                  
+                  // 스크롤 복구가 필요하다면 실행
                   window.scrollTo({
                       top: targetScrollY,
                       behavior: 'instant'
                   });
-
-                  // 5. 스크롤 이동이 끝난 뒤에 상세창 열기 및 알림
-                  setTimeout(() => {
-                      openDetail(payload);
-                      // alert이 스크롤을 방해하지 않도록 마지막에 배치
-                      alert('수정이 완료되었습니다.');
-                      listTab.style.minHeight = originalMinHeight;
-                  }, 50); 
-                  
-              }, 150); 
+              }, 100);
           }
           else {
               // [신규 저장 모드] - 이 부분이 추가되어야 저장이 됩니다!
