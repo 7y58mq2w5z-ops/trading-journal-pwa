@@ -4,7 +4,6 @@ let lastOpenedDetail = null;
 const SUPABASE_URL = window.env?.SUPABASE_URL || localStorage.getItem('SUPABASE_URL') || '';
 const SUPABASE_KEY = window.env?.SUPABASE_ANON_KEY || localStorage.getItem('SUPABASE_ANON_KEY') || '';
 
-// 개발용/테스트용 프롬프트 (최초 1회 주소 입력 장치)
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   const url = prompt("Supabase Project URL을 입력해주세요 (예: https://xxxx.supabase.co):");
   const key = prompt("Supabase Anon API Key를 입력해주세요:");
@@ -15,37 +14,34 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   }
 }
 
-// 글로벌 Supabase 인스턴스 정식 생성
+// 글로벌 Supabase 인스턴스 생성
 let supabaseClient = null;
 if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 }
 
-// 호환성 래퍼 껍데기 (주소 중복 제거 및 문법 오류 완벽 수정본)
+// 호환성 래퍼 껍데기 (400 에러 방지를 위한 표준 바인딩 최적화)
 const supabase = {
   from(table) {
-    if (!supabaseClient) {
-      return {
-        select: async () => ({ data: null, error: 'Initialization failed' }),
-        insert: async () => ({ data: null, error: 'Initialization failed' }),
-        update: async () => ({ data: null, error: 'Initialization failed' }),
-        delete: async () => ({ data: null, error: 'Initialization failed' })
-      };
-    }
     return {
       async select(query = '*') {
+        if (!supabaseClient) return { data: null, error: 'Not initialized' };
+        // 정식 SDK 문법으로 안전하게 호출
         const { data, error } = await supabaseClient.from(table).select(query);
         return { data, error };
       },
       async insert(payload) {
+        if (!supabaseClient) return { data: null, error: 'Not initialized' };
         const { data, error } = await supabaseClient.from(table).insert(payload).select();
         return { data, error };
       },
       async update(payload, matchField, matchVal) {
+        if (!supabaseClient) return { data: null, error: 'Not initialized' };
         const { data, error } = await supabaseClient.from(table).update(payload).eq(matchField, matchVal).select();
         return { data, error };
       },
       async delete(matchField, matchVal) {
+        if (!supabaseClient) return { error: 'Not initialized' };
         const { error } = await supabaseClient.from(table).delete().eq(matchField, matchVal);
         return { error };
       }
