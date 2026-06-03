@@ -638,7 +638,12 @@ function switchTab(name) {
         alert('수정이 완료되었습니다.');
       } else {
         payload.created_at = new Date().toISOString();
-        await supabase.from('trading_logs').insert(payload);
+        const { data, error } = await supabase
+          .from('trading_logs')
+          .insert(payload);
+        
+        console.log("INSERT DATA", data);
+        console.log("INSERT ERROR", error);
         alert('저장 완료');
       }
 
