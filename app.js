@@ -16,13 +16,12 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 // 글로벌 Supabase 인스턴스 정식 생성
-// index.html에서 로드한 정식 라이브러리(window.supabase)를 사용하여 충돌을 방지합니다.
 let supabaseClient = null;
 if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 }
 
-// 코드 하단과의 호환성을 위해 래퍼 껍데기 유지 (정식 클라이언트 바인딩 및 주소 중복 버그 수정)
+// 호환성 래퍼 껍데기 (주소 중복 제거 및 문법 오류 완벽 수정본)
 const supabase = {
   from(table) {
     if (!supabaseClient) {
@@ -35,7 +34,6 @@ const supabase = {
     }
     return {
       async select(query = '*') {
-        // 내부적으로 자동으로 경로를 잡아주므로 table 이름만 넘겨야 합니다.
         const { data, error } = await supabaseClient.from(table).select(query);
         return { data, error };
       },
@@ -53,19 +51,6 @@ const supabase = {
       }
     };
   },
-  storage: {
-    async upload(bucket, path, file) {
-      if (!supabaseClient) return { data: null, error: true };
-      const { data, error } = await supabaseClient.storage.from(bucket).upload(path, file);
-      return { data, error };
-    },
-    getPublicUrl(bucket, path) {
-      if (!supabaseClient) return '';
-      const { data } = supabaseClient.storage.from(bucket).getPublicUrl(path);
-      return data?.publicUrl || '';
-    }
-  }
-};
   storage: {
     async upload(bucket, path, file) {
       if (!supabaseClient) return { data: null, error: true };
