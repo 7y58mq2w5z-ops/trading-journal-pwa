@@ -188,9 +188,9 @@ async function populateMonthSelect() {
 async function incrementViews(id, currentViews) {
   const newViews = Number(currentViews || 0) + 1;
   await supabase
-  .from('trading_logs')
-  .update({ views: newViews })
-  .eq('id', id);
+    .from('trading_logs')
+    .update({ views: newViews })
+    .eq('id', id);
   return newViews;
 }
 
