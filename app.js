@@ -1,11 +1,10 @@
 let lastOpenedDetail = null;
 
-// ---------- Supabase Client 구성 (Vercel 환경변수 연동용) ----------
-// Vercel 배포 시 설정할 환경변수값을 브라우저가 읽어오도록 세팅합니다.
+// ---------- 정식 Supabase Client 구성 및 초기화 ----------
 const SUPABASE_URL = window.env?.SUPABASE_URL || localStorage.getItem('SUPABASE_URL') || '';
 const SUPABASE_KEY = window.env?.SUPABASE_ANON_KEY || localStorage.getItem('SUPABASE_ANON_KEY') || '';
 
-// 개발용/테스트용 프롬프트 (Vercel에 올리기 전 주소 입력용 장치)
+// 개발용/테스트용 프롬프트 (최초 1회 주소 입력 장치)
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   const url = prompt("Supabase Project URL을 입력해주세요 (예: https://xxxx.supabase.co):");
   const key = prompt("Supabase Anon API Key를 입력해주세요:");
@@ -16,60 +15,53 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   }
 }
 
-// 간단한 Supabase API 요청 헬퍼 함수군
+// 글로벌 Supabase 인스턴스 정식 생성
+// index.html에서 로드한 정식 라이브러리(window.supabase)를 사용하여 충돌을 방지합니다.
+let supabaseClient = null;
+if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+}
+
+// 코드 하단과의 호환성을 위해 래퍼 껍데기 유지 (정식 클라이언트 바인딩)
 const supabase = {
-  async from(table) {
-    const headers = {
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`,
-      'Content-Type': 'application/json'
-    };
+  from(table) {
+    if (!supabaseClient) {
+      return {
+        select: async () => ({ data: null, error: 'Initialization failed' }),
+        insert: async () => ({ data: null, error: 'Initialization failed' }),
+        update: async () => ({ data: null, error: 'Initialization failed' }),
+        delete: async () => ({ data: null, error: 'Initialization failed' })
+      };
+    }
     return {
       async select(query = '*') {
-        let url = `${SUPABASE_URL}/rest/v1/${table}?select=${query}`;
-        const res = await fetch(url, { headers });
-        return { data: await res.json(), error: res.ok ? null : true };
+        const { data, error } = await supabaseClient.from(table).select(query);
+        return { data, error };
       },
       async insert(payload) {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-          method: 'POST',
-          headers: { ...headers, 'Prefer': 'return=representation' },
-          body: JSON.stringify(payload)
-        });
-        return { data: await res.json(), error: res.ok ? null : true };
+        const { data, error } = await supabaseClient.from(table).insert(payload).select();
+        return { data, error };
       },
       async update(payload, matchField, matchVal) {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${matchField}=eq.${matchVal}`, {
-          method: 'PATCH',
-          headers: { ...headers, 'Prefer': 'return=representation' },
-          body: JSON.stringify(payload)
-        });
-        return { data: await res.json(), error: res.ok ? null : true };
+        const { data, error } = await supabaseClient.from(table).update(payload).eq(matchField, matchVal).select();
+        return { data, error };
       },
       async delete(matchField, matchVal) {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${matchField}=eq.${matchVal}`, {
-          method: 'DELETE',
-          headers
-        });
-        return { error: res.ok ? null : true };
+        const { error } = await supabaseClient.from(table).delete().eq(matchField, matchVal);
+        return { error };
       }
     };
   },
   storage: {
     async upload(bucket, path, file) {
-      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`, {
-        method: 'POST',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`
-        },
-        body: file
-      });
-      if (!res.ok) return { data: null, error: true };
-      return { data: { path }, error: null };
+      if (!supabaseClient) return { data: null, error: true };
+      const { data, error } = await supabaseClient.storage.from(bucket).upload(path, file);
+      return { data, error };
     },
     getPublicUrl(bucket, path) {
-      return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+      if (!supabaseClient) return '';
+      const { data } = supabaseClient.storage.from(bucket).getPublicUrl(path);
+      return data?.publicUrl || '';
     }
   }
 };
@@ -87,6 +79,7 @@ function rate(t) {
   return (pnl / buyAmount) * 100;
 }
 
+// 2026년 날짜 처리를 위해 년도를 제외한 포맷 유지
 function fmtDateNoYear(s){ if(!s) return ''; return s.slice(5); }
 function fmtNumber(n){ try { return Number(n).toLocaleString('ko-KR'); } catch { return String(n); } }
 function fmtMan(n){
@@ -665,7 +658,7 @@ function switchTab(name) {
         qty: Number(f.qty.value||0),
         buy_price: Number(f.buy_price.value||0),
         pnl_val: Number(f.pnl_val.value||0),
-        tags: chosenTags, // jsonb 배열 저장 규칙 준수
+        tags: chosenTags,
         comment: f.comment.value,
         image1_url: url1,
         image2_url: url2,
