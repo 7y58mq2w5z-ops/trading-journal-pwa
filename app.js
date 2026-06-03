@@ -1,65 +1,37 @@
 let lastOpenedDetail = null;
 
 // ---------- 정식 Supabase Client 구성 및 초기화 ----------
-const SUPABASE_URL = window.env?.SUPABASE_URL || localStorage.getItem('SUPABASE_URL') || '';
-const SUPABASE_KEY = window.env?.SUPABASE_ANON_KEY || localStorage.getItem('SUPABASE_ANON_KEY') || '';
+let SUPABASE_URL = window.env?.SUPABASE_URL || localStorage.getItem('SUPABASE_URL') || '';
+let SUPABASE_KEY = window.env?.SUPABASE_ANON_KEY || localStorage.getItem('SUPABASE_ANON_KEY') || '';
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   const url = prompt("Supabase Project URL을 입력해주세요 (예: https://xxxx.supabase.co):");
   const key = prompt("Supabase Anon API Key를 입력해주세요:");
   if (url && key) {
-    localStorage.setItem('SUPABASE_URL', url.trim());
-    localStorage.setItem('SUPABASE_ANON_KEY', key.trim());
+    SUPABASE_URL = url.trim();
+    SUPABASE_KEY = key.trim();
+    localStorage.setItem('SUPABASE_URL', SUPABASE_URL);
+    localStorage.setItem('SUPABASE_ANON_KEY', SUPABASE_KEY);
     window.location.reload();
   }
 }
 
-// 글로벌 Supabase 인스턴스 생성
-let supabaseClient = null;
+// 글로벌 Supabase 인스턴스 정식 연결
+let supabase = null;
 if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+} else {
+  // 만약 라이브러리가 로드 안 되었을 때를 대비한 최소한의 방어 코드
+  supabase = {
+    from: () => ({
+      select: async () => ({ data: null, error: 'Supabase 미초기화' }),
+      insert: async () => ({ data: null, error: 'Supabase 미초기화' }),
+      update: async () => ({ data: null, error: 'Supabase 미초기화' }),
+      delete: async () => ({ data: null, error: 'Supabase 미초기화' })
+    }),
+    storage: { from: () => ({ upload: async () => ({ error: true }), getPublicUrl: () => ({ data: null }) }) }
+  };
 }
-
-// 호환성 래퍼 껍데기 (400 에러 방지를 위한 표준 바인딩 최적화)
-const supabase = {
-  from(table) {
-    return {
-      async select(query = '*') {
-        if (!supabaseClient) return { data: null, error: 'Not initialized' };
-        // 정식 SDK 문법으로 안전하게 호출
-        const { data, error } = await supabaseClient.from(table).select(query);
-        return { data, error };
-      },
-      async insert(payload) {
-        if (!supabaseClient) return { data: null, error: 'Not initialized' };
-        const { data, error } = await supabaseClient.from(table).insert(payload).select();
-        return { data, error };
-      },
-      async update(payload, matchField, matchVal) {
-        if (!supabaseClient) return { data: null, error: 'Not initialized' };
-        const { data, error } = await supabaseClient.from(table).update(payload).eq(matchField, matchVal).select();
-        return { data, error };
-      },
-      async delete(matchField, matchVal) {
-        if (!supabaseClient) return { error: 'Not initialized' };
-        const { error } = await supabaseClient.from(table).delete().eq(matchField, matchVal);
-        return { error };
-      }
-    };
-  },
-  storage: {
-    async upload(bucket, path, file) {
-      if (!supabaseClient) return { data: null, error: true };
-      const { data, error } = await supabaseClient.storage.from(bucket).upload(path, file);
-      return { data, error };
-    },
-    getPublicUrl(bucket, path) {
-      if (!supabaseClient) return '';
-      const { data } = supabaseClient.storage.from(bucket).getPublicUrl(path);
-      return data?.publicUrl || '';
-    }
-  }
-};
 
 // ---------- Helpers ----------
 const $ = (sel) => document.querySelector(sel);
