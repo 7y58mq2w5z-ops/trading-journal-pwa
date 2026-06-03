@@ -634,7 +634,8 @@ function switchTab(name) {
       };
 
       if (editId) {
-        await supabase.from('trading_logs').update(payload, 'id', editId);
+        await supabase.from('trading_logs').update(payload)
+                                           .eq('id', editId);
         alert('수정이 완료되었습니다.');
       } else {
         payload.created_at = new Date().toISOString();
@@ -662,7 +663,8 @@ function switchTab(name) {
   $('#deleteTrade').addEventListener('click', async ()=>{
     const id = Number($('#tradeForm').id.value);
     if (id && confirm('이 거래를 삭제할까요?')) {
-      await supabase.from('trading_logs').delete('id', id);
+      await supabase.from('trading_logs').delete()
+                                         .eq('id', id);
       clearForm();
       await populateMonthSelect();
       await renderList();
