@@ -90,12 +90,13 @@ async function uploadImageToSupabase(file) {
   const fileName = `${Date.now()}_${Math.random().toString(36).substring(2,7)}.${fileExt}`;
   const filePath = `journal/${fileName}`;
 
-  const { data, error } = await supabase.storage.upload('journal-images', filePath, file);
+  const { data, error } = await supabase.storage.from('journal-images').upload(filePath, file);
   if (error) {
     console.error("Storage 업로드 실패:", error);
     return null;
   }
-  return supabase.storage.getPublicUrl('journal-images', filePath);
+  const { data: urlData } = supabase.storage.from('journal-images').getPublicUrl(filePath);
+  return urlData?.publicUrl || null;
 }
 
 // ---------- Form helpers ----------
@@ -195,7 +196,7 @@ async function incrementViews(id, currentViews) {
 }
 
 // ---------- List render ----------
-let chart;
+let chart = null;
 async function renderList() {
   const scrollPos = window.scrollY;
   const q = $('#searchInput')?.value?.trim().toLowerCase() || '';
@@ -269,17 +270,19 @@ async function renderList() {
   });
 
   // 차트 그리기
-  const byDate = {};
-  for (const t of data) if (t.date) byDate[t.date] = (byDate[t.date] || 0) + formatPnL(t);
-  const days = Object.keys(byDate).sort();
-  if (chart) chart.destroy();
-  const ctx = document.getElementById('pnlChart');
-  if (ctx) {
-    chart = new Chart(ctx, {
-      type: 'bar',
-      data: { labels: days.map(fmtDateNoYear), datasets: [{ label: '일별 손익 합계', data: days.map(d=>byDate[d]) }] },
-      options: { responsive: true, maintainAspectRatio: false }
-    });
+  if (typeof Chart !== 'undefined') {
+    const byDate = {};
+    for (const t of data) if (t.date) byDate[t.date] = (byDate[t.date] || 0) + formatPnL(t);
+    const days = Object.keys(byDate).sort();
+    if (chart) chart.destroy();
+    const ctx = document.getElementById('pnlChart');
+    if (ctx) {
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: days.map(fmtDateNoYear), datasets: [{ label: '일별 손익 합계', data: days.map(d=>byDate[d]) }] },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
   }
 }
 
@@ -330,7 +333,6 @@ async function openDetail(t){
 
   if (closeBtn) {
     closeBtn.onclick = () => {
-      console.log('닫기 실행');
       modal.classList.remove('show');
     };
   }
@@ -353,7 +355,6 @@ async function openDetail(t){
   document.getElementById('detailClose')?.insertAdjacentElement('afterend', editBtn);
 
   editBtn.addEventListener('click', ()=>{
-    console.log('X버튼 클릭됨');
     modal.classList.remove('show');
     document.querySelector('[data-tab="form"]')?.click();
     fillForm(t);
@@ -363,7 +364,7 @@ async function openDetail(t){
 }
 
 // ---------- Calendar Logic ----------
-let calendar;
+let calendar = null;
 function recomputeCalendarEvents(all) {
   const sums = {};
   all.forEach(t => { if (t.date) sums[t.date] = (sums[t.date] || 0) + formatPnL(t); });
@@ -399,7 +400,10 @@ function recomputeCalendarEvents(all) {
 }
 
 async function initCalendar() {
-  calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+  const calEl = document.getElementById('calendar');
+  if (!calEl || typeof FullCalendar === 'undefined') return;
+  
+  calendar = new FullCalendar.Calendar(calEl, {
     initialView: 'dayGridMonth', height: 'auto', locale: 'ko',
     dayCellDidMount: (arg) => {
       const d = arg.date.getDay();
@@ -425,6 +429,7 @@ async function initCalendar() {
   await refreshCalendar();
 }
 async function refreshCalendar() {
+  if (!calendar) return;
   const { data } = await supabase.from('trading_logs').select('*');
   if (data) { calendar.removeAllEvents(); calendar.addEventSource(recomputeCalendarEvents(data)); }
 }
@@ -464,7 +469,7 @@ function setupNoteModalEvents() {
   $('#noteImg1Btn')?.addEventListener('click', () => $('#noteImg1Input').click());
   $('#noteImg2Btn')?.addEventListener('click', () => $('#noteImg2Input').click());
 
-  // 일기 글 실시간 반영 저장 (블러처리 시점에 클라우드 업데이트)
+  // 정식 Supabase SDK 문법 교정 (.eq 체이닝)
   $('#noteText')?.addEventListener('blur', async () => {
     if (!currentNoteDate) return;
     const txt = $('#noteText').value;
@@ -472,7 +477,7 @@ function setupNoteModalEvents() {
     const exist = data?.find(n => n.date === currentNoteDate);
 
     if (exist) {
-      await supabase.from('daily_notes').update({ note_text: txt }, 'id', exist.id);
+      await supabase.from('daily_notes').update({ note_text: txt }).eq('id', exist.id);
     } else {
       await supabase.from('daily_notes').insert({ date: currentNoteDate, note_text: txt });
     }
@@ -491,7 +496,7 @@ function setupNoteModalEvents() {
       const exist = data?.find(n => n.date === currentNoteDate);
       const payload = {}; payload[fieldName] = uploadedUrl;
 
-      if (exist) await supabase.from('daily_notes').update(payload, 'id', exist.id);
+      if (exist) await supabase.from('daily_notes').update(payload).eq('id', exist.id);
       else { payload.date = currentNoteDate; await supabase.from('daily_notes').insert(payload); }
     });
   }
@@ -583,7 +588,7 @@ async function renderWeekList(sKey, eKey) {
 // ---------- Tab logic ----------
 function switchTab(name) {
   $$('.card').forEach(sec=>sec.classList.add('hidden'));
-  $('#tab-' + name).classList.remove('hidden');
+  $('#tab-' + name)?.classList.remove('hidden');
   $$('.tab-btn').forEach(btn=>btn.classList.remove('tab-active'));
   document.querySelector(`[data-tab="${name}"]`)?.classList.add('tab-active');
 
@@ -602,20 +607,22 @@ function switchTab(name) {
   }
 
   const form = $('#tradeForm');
-  ['image1','image2'].forEach(name=>{
-    const input = form.querySelector(`input[name="${name}"]`);
-    input?.addEventListener('change', ()=>{
-      const f = input.files?.[0];
-      const span = input.closest('label')?.querySelector('span.btn-secondary');
-      if (span) span.textContent = f ? f.name : '파일 선택';
+  if (form) {
+    ['image1','image2'].forEach(name=>{
+      const input = form.querySelector(`input[name="${name}"]`);
+      input?.addEventListener('change', ()=>{
+        const f = input.files?.[0];
+        const span = input.closest('label')?.querySelector('span.btn-secondary');
+        if (span) span.textContent = f ? f.name : '파일 선택';
+      });
     });
-  });
+  }
 
-  $('#searchInput').addEventListener('input', renderList);
-  $('#sortSelect').addEventListener('change', renderList);
+  $('#searchInput')?.addEventListener('input', renderList);
+  $('#sortSelect')?.addEventListener('change', renderList);
 
   // Submit Logic
-  form.addEventListener('submit', async (e) => {
+  form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target;
     try {
@@ -623,12 +630,11 @@ function switchTab(name) {
       let existingRecord = null;
       if (editId) {
         const { data } = await supabase.from('trading_logs').select('*');
-        existingRecord = data.find(x => x.id === editId);
+        existingRecord = data?.find(x => x.id === editId);
       }
 
-      // 실제 클라우드 Storage로 영구 업로드 진행
-      const url1 = f.image1.files?.[0] ? await uploadImageToSupabase(f.image1.files[0]) : (existingRecord?.image1_url || null);
-      const url2 = f.image2.files?.[0] ? await uploadImageToSupabase(f.image2.files[0]) : (existingRecord?.image2_url || null);
+      const url1 = f.image1?.files?.[0] ? await uploadImageToSupabase(f.image1.files[0]) : (existingRecord?.image1_url || null);
+      const url2 = f.image2?.files?.[0] ? await uploadImageToSupabase(f.image2.files[0]) : (existingRecord?.image2_url || null);
 
       const chosenTags = Array.from(document.querySelectorAll('input[name="tags[]"]:checked')).map(x=>x.value);
 
@@ -647,17 +653,11 @@ function switchTab(name) {
       };
 
       if (editId) {
-        await supabase.from('trading_logs').update(payload)
-                                           .eq('id', editId);
+        await supabase.from('trading_logs').update(payload).eq('id', editId);
         alert('수정이 완료되었습니다.');
       } else {
         payload.created_at = new Date().toISOString();
-        const { data, error } = await supabase
-          .from('trading_logs')
-          .insert(payload);
-        
-        console.log("INSERT DATA", data);
-        console.log("INSERT ERROR", error);
+        await supabase.from('trading_logs').insert(payload);
         alert('저장 완료');
       }
 
@@ -673,11 +673,10 @@ function switchTab(name) {
 
   $('#cancelBtn')?.addEventListener('click', () => { clearForm(); if (lastOpenedDetail) openDetail(lastOpenedDetail); });
 
-  $('#deleteTrade').addEventListener('click', async ()=>{
+  $('#deleteTrade')?.addEventListener('click', async ()=>{
     const id = Number($('#tradeForm').id.value);
     if (id && confirm('이 거래를 삭제할까요?')) {
-      await supabase.from('trading_logs').delete()
-                                         .eq('id', id);
+      await supabase.from('trading_logs').delete().eq('id', id);
       clearForm();
       await populateMonthSelect();
       await renderList();
@@ -686,6 +685,7 @@ function switchTab(name) {
     }
   });
 
+  // 안전한 구동을 위해 캘린더와 노트 이벤트를 초기화 마지막 단계로 조정
   await initCalendar();
   setupNoteModalEvents();
 
