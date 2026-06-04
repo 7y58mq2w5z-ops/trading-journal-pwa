@@ -679,6 +679,9 @@ function switchTab(name) {
 
   await initCalendar();
   setupNoteModalEvents();
+
+  document.getElementById('detailClose')?.addEventListener('click', () => {
+    document.getElementById('detailModal')?.classList.remove('show');
 })();
 
 window.__APP_OK__ = true;
