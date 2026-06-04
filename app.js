@@ -334,7 +334,7 @@ async function openDetail(t){
       modal.classList.remove('show');
     };
   }
-
+  }
   function attachZoomHandler(id){
     const el = document.getElementById(id);
     if (!el) return;
