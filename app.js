@@ -344,6 +344,7 @@ async function openDetail(t){
   document.getElementById('detailClose')?.insertAdjacentElement('afterend', editBtn);
 
   editBtn.addEventListener('click', ()=>{
+    console.log('X버튼 클릭됨');
     modal.classList.remove('show');
     document.querySelector('[data-tab="form"]')?.click();
     fillForm(t);
