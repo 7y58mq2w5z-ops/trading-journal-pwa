@@ -326,6 +326,15 @@ async function openDetail(t){
   const modal = $('#detailModal');
   modal.classList.add('show');
 
+  const closeBtn = document.getElementById('detailClose');
+
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      console.log('닫기 실행');
+      modal.classList.remove('show');
+    };
+  }
+
   function attachZoomHandler(id){
     const el = document.getElementById(id);
     if (!el) return;
