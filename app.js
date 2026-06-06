@@ -136,8 +136,13 @@ async function compressImage(file) {
 // ---------- Supabase 전용 이미지 업로드 엔진 ----------
 async function uploadImageToSupabase(file) {
   if (!file) return null;
+  
+  console.log("원본 용량:", Math.round(file.size / 1024), "KB");
 
   file = await compressImage(file);
+
+  console.log("압축 후 용량:", Math.round(file.size / 1024), "KB");
+
   
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}_${Math.random().toString(36).substring(2,7)}.${fileExt}`;
