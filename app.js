@@ -83,9 +83,62 @@ function toggleZoomFallback(el){
   else { document.querySelectorAll('.img-zoomed').forEach(x=>x.classList.remove('img-zoomed')); el.classList.add('img-zoomed'); }
 }
 
+async function compressImage(file) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      img.src = e.target.result;
+    };
+
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+
+      let width = img.width;
+      let height = img.height;
+
+      const MAX_SIZE = 1000;
+
+      if (width > height && width > MAX_SIZE) {
+        height *= MAX_SIZE / width;
+        width = MAX_SIZE;
+      } else if (height > MAX_SIZE) {
+        width *= MAX_SIZE / height;
+        height = MAX_SIZE;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          resolve(
+            new File(
+              [blob],
+              file.name,
+              { type: 'image/jpeg' }
+            )
+          );
+        },
+        'image/jpeg',
+        0.65
+      );
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
 // ---------- Supabase 전용 이미지 업로드 엔진 ----------
 async function uploadImageToSupabase(file) {
   if (!file) return null;
+
+  file = await compressImage(file);
+  
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}_${Math.random().toString(36).substring(2,7)}.${fileExt}`;
   const filePath = `journal/${fileName}`;
