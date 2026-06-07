@@ -84,23 +84,22 @@ function toggleZoomFallback(el){
 }
 
 async function compressImage(file) {
-  return new Promise((resolve, reject) => {
-    // 이미지 파일이 아니면 압축 없이 그대로 반환 (방어 코드)
-    if (!file.type.startsWith('image/')) {
-      return resolve(file);
-    }
-
+  return new Promise((resolve) => {
     const img = new Image();
     const reader = new FileReader();
 
-    // 1. 이벤트 리스너들을 먼저 완벽하게 정의해 둡니다.
+    reader.onload = (e) => {
+      img.src = e.target.result;
+    };
+
     img.onload = () => {
       const canvas = document.createElement('canvas');
+
       let width = img.width;
       let height = img.height;
+
       const MAX_SIZE = 1000;
 
-      // 크기 조절 로직
       if (width > height && width > MAX_SIZE) {
         height *= MAX_SIZE / width;
         width = MAX_SIZE;
@@ -113,44 +112,23 @@ async function compressImage(file) {
       canvas.height = height;
 
       const ctx = canvas.getContext('2d');
-      // 이미지가 깨지지 않도록 부드러운 품질 옵션 추가
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      
       ctx.drawImage(img, 0, 0, width, height);
-
-      // WebP 지원 브라우저면 image/webp를 쓰고, 기본은 image/jpeg로 압축
-      const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
 
       canvas.toBlob(
         (blob) => {
-          if (!blob) {
-            // 에러 시 원본 파일 반환
-            return resolve(file); 
-          }
           resolve(
             new File(
               [blob],
               file.name,
-              { type: outputType }
+              { type: 'image/jpeg' }
             )
           );
         },
-        outputType,
-        0.65 // 압축률 65%
+        'image/jpeg',
+        0.65
       );
     };
 
-    // 에러 발생 시 앱이 멈추지 않고 원본이라도 넘겨주도록 처리
-    img.onerror = () => resolve(file);
-    reader.onerror = () => resolve(file);
-
-    reader.onload = (e) => {
-      // 리스너가 등록된 '후'에 src를 꽂아주어야 안전하게 onload가 발동합니다.
-      img.src = e.target.result;
-    };
-
-    // 2. 모든 준비가 끝난 후 마지막에 읽기 시작합니다.
     reader.readAsDataURL(file);
   });
 }
