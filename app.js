@@ -533,19 +533,9 @@ async function openNoteModal(dateStr) {
 
   $('#noteText').value = row?.note_text || '';
   
-  // 평소 모달창 내부에서는 사각형 박스에 이쁘게 꽉 차게 잘리도록(cover) 기본 스타일 지정
-  const resetNormalStyle = (el) => {
-    if (!el) return;
-    el.style.width = '100%';
-    el.style.height = '120px'; // 박스 높이 고정 (원하는 높이로 조절 가능)
-    el.style.objectFit = 'cover'; // 평소에는 이쁘게 잘려서 채워짐
-    el.style.borderRadius = '8px';
-  };
-
   if (row?.note_img1_url) { 
     preview1.src = row.note_img1_url; 
-    preview1.classList.remove('hidden');
-    resetNormalStyle(preview1);
+    preview1.classList.remove('hidden'); 
   } else { 
     preview1.classList.add('hidden'); 
   }
@@ -553,36 +543,23 @@ async function openNoteModal(dateStr) {
   if (row?.note_img2_url) { 
     preview2.src = row.note_img2_url; 
     preview2.classList.remove('hidden'); 
-    resetNormalStyle(preview2);
   } else { 
     preview2.classList.add('hidden'); 
   }
 
-  // 클릭 시에만 원본 비율(contain)로 전체화면 확대 기능 연동
+  // [추가] 모달이 열리고 이미지가 세팅된 직후, 클릭 시 확대/축소 이벤트 리스너를 강제로 새로 연결합니다.
   const attachNoteZoom = (el) => {
     if (!el) return;
     el.onclick = async (ev) => {
       ev.stopPropagation();
-      
-      // 만약 기존 프로젝트에 openFullscreenImage 함수가 잘 만들어져 있다면 그것을 쓰는 게 가장 안전합니다.
-      if (typeof openFullscreenImage === 'function') {
-        openFullscreenImage(el.src);
-      } else if (typeof tryFullscreen === 'function') {
-        // tryFullscreen을 사용할 경우 확대 시점에만 잠시 contain으로 변경 시도
-        const originFit = el.style.objectFit;
-        el.style.objectFit = 'contain';
-        
+      // 기존 상세화면에서 쓰던 완벽한 확대 로직(tryFullscreen)을 그대로 호출합니다.
+      if (typeof tryFullscreen === 'function') {
         if (!(await tryFullscreen(el))) {
           if (typeof toggleZoomFallback === 'function') toggleZoomFallback(el);
         }
-        
-        // 전체화면에서 빠져나올 때 다시 원래대로 복구하기 위한 안전장치
-        document.addEventListener('fullscreenchange', function onFSChange() {
-          if (!document.fullscreenElement) {
-            el.style.objectFit = originFit;
-            document.removeEventListener('fullscreenchange', onFSChange);
-          }
-        });
+      } else if (typeof openFullscreenImage === 'function') {
+        // 만약 기존 openFullscreenImage 함수를 꼭 써야 하는 환경이라면 아래 줄 주석을 해제하세요.
+        openFullscreenImage(el.src);
       }
     };
   };
@@ -592,6 +569,7 @@ async function openNoteModal(dateStr) {
 
   noteModal.classList.remove('hidden');
 }
+
 function setupNoteModalEvents() {
   if (!noteModal) return;
   $('#noteClose')?.addEventListener('click', () => noteModal.classList.add('hidden'));
@@ -619,18 +597,15 @@ function setupNoteModalEvents() {
       const uploadedUrl = await uploadImageToSupabase(file);
       if (!uploadedUrl) return;
 
-      previewEl.src = uploadedUrl; 
-      previewEl.classList.remove('hidden');
-      
-      // [보정] 업로드 직후에도 평소 스타일(cover) 유지
-      previewEl.style.width = '100%';
-      previewEl.style.height = '120px';
-      previewEl.style.objectFit = 'cover';
-      previewEl.style.borderRadius = '8px';
+      previewEl.src = uploadedUrl; previewEl.classList.remove('hidden');
 
-      previewEl.onclick = () => {
-        if (typeof openFullscreenImage === 'function') {
-          openFullscreenImage(previewEl.src);
+      // [추가] 방금 업로드되어 바뀐 이미지에도 클릭 이벤트 리스너를 한 번 더 갱신해 줍니다.
+      previewEl.onclick = async (ev) => {
+        ev.stopPropagation();
+        if (typeof tryFullscreen === 'function') {
+          if (!(await tryFullscreen(previewEl))) {
+            if (typeof toggleZoomFallback === 'function') toggleZoomFallback(previewEl);
+          }
         }
       };
 
