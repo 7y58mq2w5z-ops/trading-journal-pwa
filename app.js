@@ -550,12 +550,13 @@ async function openNoteModal(dateStr) {
   // [추가] 모달이 열리고 이미지가 세팅된 직후, 클릭 시 확대/축소 이벤트 리스너를 강제로 새로 연결합니다.
   const attachNoteZoom = (el) => {
     if (!el) return;
+  
     el.onclick = (ev) => {
       ev.stopPropagation();
-    
-      if (typeof openFullscreenImage === 'function') {
-        openFullscreenImage(el.src);
-      }
+  
+      console.log('확대 클릭');
+  
+      openFullscreenImage(el.src);
     };
   };
 
