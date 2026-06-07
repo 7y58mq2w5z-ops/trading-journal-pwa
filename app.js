@@ -533,9 +533,19 @@ async function openNoteModal(dateStr) {
 
   $('#noteText').value = row?.note_text || '';
   
+  // 평소 모달창 내부에서는 사각형 박스에 이쁘게 꽉 차게 잘리도록(cover) 기본 스타일 지정
+  const resetNormalStyle = (el) => {
+    if (!el) return;
+    el.style.width = '100%';
+    el.style.height = '120px'; // 박스 높이 고정 (원하는 높이로 조절 가능)
+    el.style.objectFit = 'cover'; // 평소에는 이쁘게 잘려서 채워짐
+    el.style.borderRadius = '8px';
+  };
+
   if (row?.note_img1_url) { 
     preview1.src = row.note_img1_url; 
-    preview1.classList.remove('hidden'); 
+    preview1.classList.remove('hidden');
+    resetNormalStyle(preview1);
   } else { 
     preview1.classList.add('hidden'); 
   }
@@ -543,33 +553,36 @@ async function openNoteModal(dateStr) {
   if (row?.note_img2_url) { 
     preview2.src = row.note_img2_url; 
     preview2.classList.remove('hidden'); 
+    resetNormalStyle(preview2);
   } else { 
     preview2.classList.add('hidden'); 
   }
 
-  // [추가] 모달이 열리고 이미지가 세팅된 직후, 클릭 시 확대/축소 이벤트 리스너를 강제로 새로 연결합니다.
+  // 클릭 시에만 원본 비율(contain)로 전체화면 확대 기능 연동
   const attachNoteZoom = (el) => {
     if (!el) return;
     el.onclick = async (ev) => {
       ev.stopPropagation();
       
-      // 1. 이미지가 꽉 차 보이게 만들던 기존의 Tailwind/CSS 클래스를 강제로 무력화합니다.
-      // (이 클래스들이 object-fit: cover를 유발해서 사진이 잘려 보였던 것입니다.)
-      el.style.setProperty('width', 'auto', 'important');
-      el.style.setProperty('height', 'auto', 'important');
-      el.style.setProperty('max-width', '100vw', 'important');
-      el.style.setProperty('max-height', '100vh', 'important');
-      el.style.setProperty('margin', '0', 'important');
-
-      // 2. [핵심] 사진 비율을 온전히 유지하며 화면 안에 쏙 들어오게 만드는 스타일을 주입합니다.
-      el.style.setProperty('object-fit', 'contain', 'important');
-
-      // 3. 기존 상세화면에서 쓰던 완벽한 확대 로직(tryFullscreen)을 호출합니다.
-      if (typeof tryFullscreen === 'function') {
+      // 만약 기존 프로젝트에 openFullscreenImage 함수가 잘 만들어져 있다면 그것을 쓰는 게 가장 안전합니다.
+      if (typeof openFullscreenImage === 'function') {
+        openFullscreenImage(el.src);
+      } else if (typeof tryFullscreen === 'function') {
+        // tryFullscreen을 사용할 경우 확대 시점에만 잠시 contain으로 변경 시도
+        const originFit = el.style.objectFit;
+        el.style.objectFit = 'contain';
+        
         if (!(await tryFullscreen(el))) {
-          // 실패 시 폴백 실행
           if (typeof toggleZoomFallback === 'function') toggleZoomFallback(el);
         }
+        
+        // 전체화면에서 빠져나올 때 다시 원래대로 복구하기 위한 안전장치
+        document.addEventListener('fullscreenchange', function onFSChange() {
+          if (!document.fullscreenElement) {
+            el.style.objectFit = originFit;
+            document.removeEventListener('fullscreenchange', onFSChange);
+          }
+        });
       }
     };
   };
@@ -579,7 +592,6 @@ async function openNoteModal(dateStr) {
 
   noteModal.classList.remove('hidden');
 }
-
 function setupNoteModalEvents() {
   if (!noteModal) return;
   $('#noteClose')?.addEventListener('click', () => noteModal.classList.add('hidden'));
@@ -607,15 +619,18 @@ function setupNoteModalEvents() {
       const uploadedUrl = await uploadImageToSupabase(file);
       if (!uploadedUrl) return;
 
-      previewEl.src = uploadedUrl; previewEl.classList.remove('hidden');
+      previewEl.src = uploadedUrl; 
+      previewEl.classList.remove('hidden');
+      
+      // [보정] 업로드 직후에도 평소 스타일(cover) 유지
+      previewEl.style.width = '100%';
+      previewEl.style.height = '120px';
+      previewEl.style.objectFit = 'cover';
+      previewEl.style.borderRadius = '8px';
 
-      // [추가] 방금 업로드되어 바뀐 이미지에도 클릭 이벤트 리스너를 한 번 더 갱신해 줍니다.
-      previewEl.onclick = async (ev) => {
-        ev.stopPropagation();
-        if (typeof tryFullscreen === 'function') {
-          if (!(await tryFullscreen(previewEl))) {
-            if (typeof toggleZoomFallback === 'function') toggleZoomFallback(previewEl);
-          }
+      previewEl.onclick = () => {
+        if (typeof openFullscreenImage === 'function') {
+          openFullscreenImage(previewEl.src);
         }
       };
 
@@ -627,6 +642,7 @@ function setupNoteModalEvents() {
       else { payload.date = currentNoteDate; await supabase.from('daily_notes').insert(payload); }
     });
   }
+  
   handleNoteImg($('#noteImg1Input'), $('#noteImg1Preview'), 'note_img1_url');
   handleNoteImg($('#noteImg2Input'), $('#noteImg2Preview'), 'note_img2_url');
 
