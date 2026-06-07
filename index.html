@@ -127,7 +127,7 @@
       <h2 class="text-lg font-semibold mb-3">거래 입력/수정</h2>
       <form id="tradeForm" class="grid grid-cols-1 gap-3">
         <input type="hidden" name="id" value="">
-        <label class="label">날짜 <input type="date" name="date" required class="input"></label>
+        <label class="label">날짜 <input type="date" name="date" required class="input" style="width: 100% !important; box-sizing: border-box !important; height: 2.5rem !important;"></label>
         <label class="label">종목명 <input type="text" name="symbol" required class="input" placeholder="종목명"></label>
 
         <label class="inline-flex items-center gap-2">
@@ -236,16 +236,18 @@
       </div>
     </div>
 
-    <div id="noteModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-      <div class="bg-white p-4 rounded-xl w-full max-w-lg relative m-4">
-        <button id="noteClose" class="absolute right-3 top-2 text-slate-500 text-2xl">&times;</button>
+    <div id="noteModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50" style="padding: 1rem !important;">
+      <div class="bg-white p-5 rounded-xl w-full max-w-sm relative m-4" style="max-height: 85vh !important; overflow-y: auto !important; box-sizing: border-box !important; padding-top: 2.5rem !important;">
+        
+        <button id="noteClose" class="absolute right-4 top-3 text-slate-500 hover:text-slate-700" style="font-size: 1.75rem !important; line-height: 1 !important; padding: 0.25rem !important; cursor: pointer;">&times;</button>
+        
         <h3 class="text-lg font-semibold mb-3">
           <span id="noteDateLabel">일자 메모 및 이미지</span>
         </h3>
-
+    
         <textarea id="noteText" class="w-full border rounded p-2 mb-3" rows="4"
                   placeholder="오늘 일기 / 지수 흐름 등을 기록하세요"></textarea>
-
+    
         <div class="flex gap-2">
           <div class="w-1/2">
             <button id="noteImg1Btn" class="btn-secondary w-full mb-1 text-sm">이미지 1 선택</button>
