@@ -550,15 +550,10 @@ async function openNoteModal(dateStr) {
   // [추가] 모달이 열리고 이미지가 세팅된 직후, 클릭 시 확대/축소 이벤트 리스너를 강제로 새로 연결합니다.
   const attachNoteZoom = (el) => {
     if (!el) return;
-    el.onclick = async (ev) => {
+    el.onclick = (ev) => {
       ev.stopPropagation();
-      // 기존 상세화면에서 쓰던 완벽한 확대 로직(tryFullscreen)을 그대로 호출합니다.
-      if (typeof tryFullscreen === 'function') {
-        if (!(await tryFullscreen(el))) {
-          if (typeof toggleZoomFallback === 'function') toggleZoomFallback(el);
-        }
-      } else if (typeof openFullscreenImage === 'function') {
-        // 만약 기존 openFullscreenImage 함수를 꼭 써야 하는 환경이라면 아래 줄 주석을 해제하세요.
+    
+      if (typeof openFullscreenImage === 'function') {
         openFullscreenImage(el.src);
       }
     };
