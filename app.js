@@ -84,6 +84,8 @@ function toggleZoomFallback(el){
 }
 
 async function compressImage(file) {
+  console.log('원본 크기:', Math.round(file.size / 1024), 'KB');
+  
   return new Promise((resolve) => {
     const img = new Image();
     const reader = new FileReader();
@@ -116,13 +118,20 @@ async function compressImage(file) {
 
       canvas.toBlob(
         (blob) => {
-          resolve(
-            new File(
-              [blob],
-              file.name,
-              { type: 'image/jpeg' }
-            )
+      
+          const compressedFile = new File(
+            [blob],
+            file.name,
+            { type: 'image/jpeg' }
           );
+      
+          console.log(
+            '압축 후 크기:',
+            Math.round(compressedFile.size / 1024),
+            'KB'
+          );
+      
+          resolve(compressedFile);
         },
         'image/jpeg',
         0.65
@@ -135,6 +144,13 @@ async function compressImage(file) {
 
 // ---------- Supabase 전용 이미지 업로드 엔진 ----------
 async function uploadImageToSupabase(file) {
+
+  console.log(
+    '업로드 크기:',
+    Math.round(file.size / 1024),
+    'KB'
+  );
+  
   if (!file) return null;
   
   console.log("원본 용량:", Math.round(file.size / 1024), "KB");
