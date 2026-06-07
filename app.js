@@ -552,14 +552,24 @@ async function openNoteModal(dateStr) {
     if (!el) return;
     el.onclick = async (ev) => {
       ev.stopPropagation();
-      // 기존 상세화면에서 쓰던 완벽한 확대 로직(tryFullscreen)을 그대로 호출합니다.
+      
+      // 1. 이미지가 꽉 차 보이게 만들던 기존의 Tailwind/CSS 클래스를 강제로 무력화합니다.
+      // (이 클래스들이 object-fit: cover를 유발해서 사진이 잘려 보였던 것입니다.)
+      el.style.setProperty('width', 'auto', 'important');
+      el.style.setProperty('height', 'auto', 'important');
+      el.style.setProperty('max-width', '100vw', 'important');
+      el.style.setProperty('max-height', '100vh', 'important');
+      el.style.setProperty('margin', '0', 'important');
+
+      // 2. [핵심] 사진 비율을 온전히 유지하며 화면 안에 쏙 들어오게 만드는 스타일을 주입합니다.
+      el.style.setProperty('object-fit', 'contain', 'important');
+
+      // 3. 기존 상세화면에서 쓰던 완벽한 확대 로직(tryFullscreen)을 호출합니다.
       if (typeof tryFullscreen === 'function') {
         if (!(await tryFullscreen(el))) {
+          // 실패 시 폴백 실행
           if (typeof toggleZoomFallback === 'function') toggleZoomFallback(el);
         }
-      } else if (typeof openFullscreenImage === 'function') {
-        // 만약 기존 openFullscreenImage 함수를 꼭 써야 하는 환경이라면 아래 줄 주석을 해제하세요.
-        openFullscreenImage(el.src);
       }
     };
   };
