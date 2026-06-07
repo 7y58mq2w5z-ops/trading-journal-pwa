@@ -691,8 +691,18 @@ function switchTab(name) {
         existingRecord = data?.find(x => x.id === editId);
       }
 
-      const url1 = f.image1?.files?.[0] ? await uploadImageToSupabase(f.image1.files[0]) : (existingRecord?.image1_url || null);
-      const url2 = f.image2?.files?.[0] ? await uploadImageToSupabase(f.image2.files[0]) : (existingRecord?.image2_url || null);
+      let url1 = existingRecord?.image1_url || null;
+      let url2 = existingRecord?.image2_url || null;
+      
+      if (f.image1?.files?.[0]) {
+        const compressed1 = await compressImage(f.image1.files[0]);
+        url1 = await uploadImageToSupabase(compressed1);
+      }
+      
+      if (f.image2?.files?.[0]) {
+        const compressed2 = await compressImage(f.image2.files[0]);
+        url2 = await uploadImageToSupabase(compressed2);
+      }
 
       const chosenTags = Array.from(document.querySelectorAll('input[name="tags[]"]:checked')).map(x=>x.value);
 
