@@ -619,8 +619,7 @@ function setupNoteModalEvents() {
   $('#noteImg1Preview')?.addEventListener('click', () => openFullscreenImage($('#noteImg1Preview').src));
   $('#noteImg2Preview')?.addEventListener('click', () => openFullscreenImage($('#noteImg2Preview').src));
   $('#imgFullscreen')?.addEventListener('click', () => {
-    $('#imgFullscreen').classList.add('hidden');
-    $('#imgFullscreen').classList.remove('flex');
+  $('#imgFullscreen').classList.add('hidden');
   });
 }
 
