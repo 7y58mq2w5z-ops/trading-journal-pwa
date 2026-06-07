@@ -620,6 +620,7 @@ function setupNoteModalEvents() {
   $('#noteImg2Preview')?.addEventListener('click', () => openFullscreenImage($('#noteImg2Preview').src));
   $('#imgFullscreen')?.addEventListener('click', () => {
   $('#imgFullscreen').classList.add('hidden');
+  $('#imgFullscreen').classList.remove('flex');
   });
 }
 
