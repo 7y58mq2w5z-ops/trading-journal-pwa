@@ -622,9 +622,15 @@ function setupNoteModalEvents() {
 }
 
 function openFullscreenImage(src) {
-  if (!$('#imgFullscreen') || !src) return;
-  $('#imgFullscreenImg').src = src;
-  $('#imgFullscreen').classList.remove('hidden');
+  const modal = $('#imgFullscreen');
+  const img = $('#imgFullscreenImg');
+
+  if (!modal || !img || !src) return;
+
+  img.src = src;
+
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
 }
 
 // ---------- Calendar List View ----------
