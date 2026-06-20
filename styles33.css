@@ -48,3 +48,19 @@ body { background: var(--bg); color: var(--text); }
 #listContainer td:nth-child(5) { color: #64748b; } /* 조회수 컬럼 slate-500 느낌 */
 #listContainer .pnl-pos, #listContainer .pnl-neg { font-variant-numeric: tabular-nums; }
 
+#imgFullscreen {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.95);
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+#imgFullscreenImg {
+  max-width: 95vw;
+  max-height: 95vh;
+  object-fit: contain;
+}
+
