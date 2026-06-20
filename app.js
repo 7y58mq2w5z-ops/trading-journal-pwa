@@ -1,6 +1,4 @@
 let lastOpenedDetail = null;
-let calendar = null;
-let calendarInitialized = false;
 
 // ---------- 정식 Supabase Client 구성 및 초기화 ----------
 let SUPABASE_URL = window.env?.SUPABASE_URL || localStorage.getItem('SUPABASE_URL') || '';
@@ -750,7 +748,7 @@ async function renderWeekList(sKey, eKey) {
 }
 
 // ---------- Tab logic ----------
-/*function switchTab(name) {
+function switchTab(name) {
   $$('.card').forEach(sec=>sec.classList.add('hidden'));
   $('#tab-' + name)?.classList.remove('hidden');
   $$('.tab-btn').forEach(btn=>btn.classList.remove('tab-active'));
@@ -761,29 +759,9 @@ async function renderWeekList(sKey, eKey) {
   }
 
   if (name === 'list' && !$('#tradeForm').id.value) renderList();
-}*/
-
-async function switchTab(name) {
-  $$('.card').forEach(sec=>sec.classList.add('hidden'));
-  $('#tab-' + name)?.classList.remove('hidden');
-
-  $$('.tab-btn').forEach(btn=>btn.classList.remove('tab-active'));
-  document.querySelector(`[data-tab="${name}"]`)?.classList.add('tab-active');
-
-  if (name === 'calendar') {
-
-    if (!calendarInitialized) {
-      await initCalendar();
-      calendarInitialized = true;
-    }
-
-    calendar?.updateSize();
-  }
-
-  if (name === 'list' && !$('#tradeForm').id.value) {
-    renderList();
-  }
 }
+
+
 // ---------- Init ----------
 (async function init() {
   $$('.tab-btn').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
@@ -890,7 +868,7 @@ async function switchTab(name) {
   });
 
   // 안전한 구동을 위해 캘린더와 노트 이벤트를 초기화 마지막 단계로 조정
-  // await initCalendar();
+  await initCalendar();
   setupNoteModalEvents();
 
 })();
