@@ -624,7 +624,27 @@ function setupNoteModalEvents() {
   $('#imgFullscreen').classList.remove('flex');
   });
 }
+function openFullscreenImage(src) {
+  const wrap = document.getElementById('imgFullscreen');
+  const img = document.getElementById('imgFullscreenImg');
 
+  if (!wrap || !img || !src) return;
+
+  img.src = src;
+
+  wrap.classList.remove('hidden');
+  wrap.style.display = 'flex';
+}
+
+function closeFullscreenImage() {
+  const wrap = document.getElementById('imgFullscreen');
+
+  if (!wrap) return;
+
+  wrap.classList.add('hidden');
+  wrap.style.display = 'none';
+}
+/*
 function openFullscreenImage(src) {
   const modal = $('#imgFullscreen');
   const img = $('#imgFullscreenImg');
@@ -636,7 +656,7 @@ function openFullscreenImage(src) {
   modal.classList.remove('hidden');
   modal.classList.add('flex');
 }
-
+*/
 // ---------- Calendar List View ----------
 async function renderCalendarList(dateStr) {
   const { data } = await supabase.from('trading_logs').select('*');
