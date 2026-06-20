@@ -763,6 +763,8 @@ function switchTab(name) {
   $$('.tab-btn').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
   switchTab('list');
 
+  window.scrollTo(0, 0);
+  
   if (SUPABASE_URL && SUPABASE_KEY) {
     await populateMonthSelect();
     await renderList();
