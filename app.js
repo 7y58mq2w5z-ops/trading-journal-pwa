@@ -823,5 +823,45 @@ function switchTab(name) {
   setupNoteModalEvents();
 
 })();
+// ---------- 앱 잠금번호 설정 (원하는 4자리 숫자로 변경하세요) ----------
+const APP_PASSWORD = "9410"; 
 
+document.addEventListener('DOMContentLoaded', () => {
+  const lockModal = document.getElementById('lockModal');
+  const passwordInput = document.getElementById('lockPassword');
+  const unlockBtn = document.getElementById('lockUnlockBtn');
+  const errorMsg = document.getElementById('lockError');
+
+  // 잠금 해제 인증 함수
+  function checkPassword() {
+    if (passwordInput.value === APP_PASSWORD) {
+      // 비밀번호가 맞으면 모달을 부드럽게 숨김 처리
+      lockModal.style.setProperty('display', 'none', 'important');
+      passwordInput.value = ''; // 입력창 초기화
+      errorMsg.classList.add('hidden');
+    } else {
+      // 틀리면 에러 메시지 노출 및 진동 효과(모바일 지원 시)
+      errorMsg.classList.remove('hidden');
+      passwordInput.value = '';
+      passwordInput.focus();
+      if (navigator.vibrate) navigator.vibrate(200); 
+    }
+  }
+
+  // 버튼 클릭 시 체크
+  unlockBtn?.addEventListener('click', checkPassword);
+
+  // 엔터 키 입력 시 체크
+  passwordInput?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') checkPassword();
+  });
+
+  // 숫자가 4자리 다 차면 버튼 안 눌러도 자동으로 체크하는 편의 기능
+  passwordInput?.addEventListener('input', () => {
+    if (passwordInput.value.length === 4) {
+      // 키보드가 내려갈 시간을 주기 위해 0.1초 뒤 실행
+      setTimeout(checkPassword, 100);
+    }
+  });
+});
 window.__APP_OK__ = true;
