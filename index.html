@@ -108,6 +108,22 @@
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
+  <div id="lockModal" class="fixed inset-0 bg-slate-900 flex items-center justify-center z-[9999]">
+    <div class="bg-white p-6 rounded-2xl w-full max-w-sm text-center shadow-xl m-4">
+      <div class="text-4xl mb-3">🔒</div>
+      <h3 class="text-xl font-bold text-slate-800 mb-1">매매일지 잠금 해제</h3>
+      <p class="text-sm text-slate-500 mb-5">비밀번호를 입력해야 접속할 수 있습니다.</p>
+      
+      <input type="password" id="lockPassword" 
+             class="w-full border-2 border-slate-200 rounded-xl p-3 text-center text-lg font-bold tracking-widest focus:border-indigo-500 focus:outline-none mb-4" 
+             placeholder="••••" maxlength="4" inputmode="numeric">
+      
+      <button id="lockUnlockBtn" class="w-full bg-indigo-600 text-white p-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors">
+        잠금 해제
+      </button>
+      <p id="lockError" class="text-red-500 text-xs mt-2 hidden">비밀번호가 일치하지 않습니다.</p>
+    </div>
+  </div>
   <div id="app" class="max-w-3xl mx-auto p-4 pb-24">
     <header class="flex items-center justify-between mb-4">
      <div class="flex items-baseline gap-2">
