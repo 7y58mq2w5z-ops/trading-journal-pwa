@@ -288,8 +288,15 @@ async function renderList() {
   });
 
   rows.sort((a,b)=>{
-    if (sortKey === 'date_desc') return (b.date||'').localeCompare(a.date||'');
-    if (sortKey === 'date_asc') return (a.date||'').localeCompare(b.date||'');
+    if (sortKey === 'date_desc') {
+      const dateCmp = (b.date||'').localeCompare(a.date||'');
+      return dateCmp !== 0 ? dateCmp : (b.id - a.id);
+    }
+    
+    if (sortKey === 'date_asc') {
+      const dateCmp = (a.date||'').localeCompare(b.date||'');
+      return dateCmp !== 0 ? dateCmp : (a.id - b.id);
+    }
     if (sortKey === 'pnl_desc') return formatPnL(b) - formatPnL(a);
     if (sortKey === 'pnl_asc') return formatPnL(a) - formatPnL(b);
     return 0;
@@ -339,7 +346,7 @@ async function renderList() {
       const updatedViews = await incrementViews(id, targetData.views);
       targetData.views = updatedViews;
       openDetail(targetData);
-      // renderList();
+      renderList();
     });
   });
 
