@@ -339,7 +339,7 @@ async function renderList() {
       const updatedViews = await incrementViews(id, targetData.views);
       targetData.views = updatedViews;
       openDetail(targetData);
-      renderList();
+      // renderList();
     });
   });
 
