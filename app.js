@@ -773,12 +773,16 @@ function switchTab(name) {
 (async function init() {
   $$('.tab-btn').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
   switchTab('list');
-
-  window.scrollTo(0, 0);
   
   if (SUPABASE_URL && SUPABASE_KEY) {
     await populateMonthSelect();
     await renderList();
+
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'instant'
+    });
   }
 
   const form = $('#tradeForm');
