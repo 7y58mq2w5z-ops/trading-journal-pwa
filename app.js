@@ -617,8 +617,20 @@ function setupNoteModalEvents() {
   handleNoteImg($('#noteImg1Input'), $('#noteImg1Preview'), 'note_img1_url');
   handleNoteImg($('#noteImg2Input'), $('#noteImg2Preview'), 'note_img2_url');
 
-  $('#noteImg1Preview')?.addEventListener('click', () => openFullscreenImage($('#noteImg1Preview').src));
-  $('#noteImg2Preview')?.addEventListener('click', () => openFullscreenImage($('#noteImg2Preview').src));
+  //$('#noteImg1Preview')?.addEventListener('click', () => openFullscreenImage($('#noteImg1Preview').src));
+  //$('#noteImg2Preview')?.addEventListener('click', () => openFullscreenImage($('#noteImg2Preview').src));
+  document.getElementById('noteImg1Preview')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openFullscreenImage(e.target.src);
+  });
+  
+  document.getElementById('noteImg2Preview')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openFullscreenImage(e.target.src);
+  });
+  document.getElementById('imgFullscreen')?.addEventListener('click', () => {
+    closeFullscreenImage();
+  });
   $('#imgFullscreen')?.addEventListener('click', () => {
   $('#imgFullscreen').classList.add('hidden');
   $('#imgFullscreen').classList.remove('flex');
