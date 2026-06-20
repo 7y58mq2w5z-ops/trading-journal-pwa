@@ -748,7 +748,7 @@ async function renderWeekList(sKey, eKey) {
 }
 
 // ---------- Tab logic ----------
-function switchTab(name) {
+/*function switchTab(name) {
   $$('.card').forEach(sec=>sec.classList.add('hidden'));
   $('#tab-' + name)?.classList.remove('hidden');
   $$('.tab-btn').forEach(btn=>btn.classList.remove('tab-active'));
@@ -756,8 +756,19 @@ function switchTab(name) {
 
   if (name === 'calendar') refreshCalendar();
   if (name === 'list' && !$('#tradeForm').id.value) renderList();
-}
+}*/
+function switchTab(name) {
+  $$('.card').forEach(sec=>sec.classList.add('hidden'));
+  $('#tab-' + name)?.classList.remove('hidden');
+  $$('.tab-btn').forEach(btn=>btn.classList.remove('tab-active'));
+  document.querySelector(`[data-tab="${name}"]`)?.classList.add('tab-active');
 
+  if (name === 'calendar') {
+    setTimeout(() => calendar?.updateSize(), 50);
+  }
+
+  if (name === 'list' && !$('#tradeForm').id.value) renderList();
+}
 // ---------- Init ----------
 (async function init() {
   $$('.tab-btn').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
