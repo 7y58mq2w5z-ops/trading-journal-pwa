@@ -871,7 +871,8 @@ function switchTab(name) {
   
       await renderList();
       await refreshCalendar();
-  
+      
+      clearForm(); 
       switchTab('list');
   
       if (savedTrade) {
