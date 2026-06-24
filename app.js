@@ -904,25 +904,25 @@ function switchTab(name) {
   // $('#cancelBtn')?.addEventListener('click', () => { clearForm(); if (lastOpenedDetail) openDetail(lastOpenedDetail); });
 
   $('#cancelBtn')?.addEventListener('click', () => {
-
-  clearForm();
-
-  // 상세보기에서 편집 들어온 경우
-  if (editModeFromDetail && lastOpenedDetail) {
-
+  
+    clearForm();
+  
+    // 상세보기에서 편집 들어온 경우
+    if (editModeFromDetail && lastOpenedDetail) {
+  
+      switchTab('list');
+  
+      setTimeout(() => {
+        openDetail(lastOpenedDetail);
+      }, 100);
+  
+      editModeFromDetail = false;
+      return;
+    }
+  
+    // 일반 입력 중 취소
     switchTab('list');
-
-    setTimeout(() => {
-      openDetail(lastOpenedDetail);
-    }, 100);
-
-    editModeFromDetail = false;
-    return;
-  }
-
-  // 일반 입력 중 취소
-  switchTab('list');
-});
+  });
 
   $('#deleteTrade')?.addEventListener('click', async ()=>{
     const id = Number($('#tradeForm').id.value);
