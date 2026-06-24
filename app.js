@@ -797,35 +797,40 @@ function switchTab(name) {
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target;
+  
     try {
       const editId = f.id.value ? Number(f.id.value) : null;
       let existingRecord = null;
+      let savedTrade = null;
+  
       if (editId) {
         const { data } = await supabase.from('trading_logs').select('*');
         existingRecord = data?.find(x => x.id === editId);
       }
-
+  
       let url1 = existingRecord?.image1_url || null;
       let url2 = existingRecord?.image2_url || null;
-      
+  
       if (f.image1?.files?.[0]) {
         const compressed1 = await compressImage(f.image1.files[0]);
         url1 = await uploadImageToSupabase(compressed1);
       }
-      
+  
       if (f.image2?.files?.[0]) {
         const compressed2 = await compressImage(f.image2.files[0]);
         url2 = await uploadImageToSupabase(compressed2);
       }
-
-      const chosenTags = Array.from(document.querySelectorAll('input[name="tags[]"]:checked')).map(x=>x.value);
-
+  
+      const chosenTags = Array.from(
+        document.querySelectorAll('input[name="tags[]"]:checked')
+      ).map(x => x.value);
+  
       const payload = {
         date: f.date.value,
         symbol: f.symbol.value.trim(),
-        qty: Number(f.qty.value||0),
-        buy_price: Number(f.buy_price.value||0),
-        pnl_val: Number(f.pnl_val.value||0),
+        qty: Number(f.qty.value || 0),
+        buy_price: Number(f.buy_price.value || 0),
+        pnl_val: Number(f.pnl_val.value || 0),
         tags: chosenTags,
         comment: f.comment.value,
         image1_url: url1,
@@ -833,20 +838,46 @@ function switchTab(name) {
         highlight: !!f.highlight?.checked,
         views: existingRecord ? Number(existingRecord.views || 0) : 0
       };
-
+  
       if (editId) {
-        await supabase.from('trading_logs').update(payload).eq('id', editId);
+  
+        await supabase
+          .from('trading_logs')
+          .update(payload)
+          .eq('id', editId);
+  
+        savedTrade = {
+          ...existingRecord,
+          ...payload,
+          id: editId
+        };
+  
         alert('수정이 완료되었습니다.');
+  
       } else {
+  
         payload.created_at = new Date().toISOString();
-        await supabase.from('trading_logs').insert(payload);
+  
+        const { data: insertedData } = await supabase
+          .from('trading_logs')
+          .insert(payload)
+          .select()
+          .single();
+  
+        savedTrade = insertedData;
+  
         alert('저장 완료');
       }
-
+  
       await renderList();
       await refreshCalendar();
-      clearForm();
+  
       switchTab('list');
+  
+      if (savedTrade) {
+        openDetail(savedTrade);
+      }
+  
     } catch (err) {
       console.error(err);
       alert("처리 중 에러가 발생했습니다.");
