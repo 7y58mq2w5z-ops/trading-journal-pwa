@@ -372,6 +372,8 @@ async function openDetail(t){
   lastOpenedDetail = t;
   const pnl = formatPnL(t), r = rate(t), buyAmount = calcBuyAmount(t);
 
+  let editModeFromDetail = false;
+  
   // Supabase daily_notes 테이블에서 실시간 매칭 일기 가져오기
   const { data: noteData } = await supabase.from('daily_notes').select('*');
   const matchedNote = noteData?.find(n => n.date === t.date);
@@ -435,13 +437,27 @@ async function openDetail(t){
   editBtn.style.position = 'absolute'; editBtn.style.right = '.75rem'; editBtn.style.top = '3rem';
   document.getElementById('detailClose')?.insertAdjacentElement('afterend', editBtn);
 
-  editBtn.addEventListener('click', ()=>{
+  /*editBtn.addEventListener('click', ()=>{
     modal.classList.remove('show');
     document.querySelector('[data-tab="form"]')?.click();
     fillForm(t);
     setFormMode('edit');
     document.getElementById('tradeForm')?.scrollIntoView({behavior:'smooth', block:'start'});
+  });*/
+  editBtn.addEventListener('click', ()=>{
+  
+    editModeFromDetail = true;
+  
+    modal.classList.remove('show');
+    document.querySelector('[data-tab="form"]')?.click();
+  
+    fillForm(t);
+    setFormMode('edit');
+  
+    document.getElementById('tradeForm')
+      ?.scrollIntoView({behavior:'smooth', block:'start'});
   });
+  
 }
 
 // ---------- Calendar Logic ----------
@@ -885,7 +901,28 @@ function switchTab(name) {
     }
   });
 
-  $('#cancelBtn')?.addEventListener('click', () => { clearForm(); if (lastOpenedDetail) openDetail(lastOpenedDetail); });
+  // $('#cancelBtn')?.addEventListener('click', () => { clearForm(); if (lastOpenedDetail) openDetail(lastOpenedDetail); });
+
+  $('#cancelBtn')?.addEventListener('click', () => {
+
+  clearForm();
+
+  // 상세보기에서 편집 들어온 경우
+  if (editModeFromDetail && lastOpenedDetail) {
+
+    switchTab('list');
+
+    setTimeout(() => {
+      openDetail(lastOpenedDetail);
+    }, 100);
+
+    editModeFromDetail = false;
+    return;
+  }
+
+  // 일반 입력 중 취소
+  switchTab('list');
+});
 
   $('#deleteTrade')?.addEventListener('click', async ()=>{
     const id = Number($('#tradeForm').id.value);
