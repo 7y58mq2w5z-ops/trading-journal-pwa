@@ -200,7 +200,7 @@ function setFormMode(mode) {
     deleteBtn.classList.remove('hidden');
   } else {
     saveBtn.textContent = '저장';
-    cancelBtn.textContent = '새로 입력';
+    cancelBtn.textContent = '취소';
     deleteBtn.classList.add('hidden');
   }
 }
