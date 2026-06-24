@@ -903,7 +903,7 @@ function switchTab(name) {
 
   // $('#cancelBtn')?.addEventListener('click', () => { clearForm(); if (lastOpenedDetail) openDetail(lastOpenedDetail); });
 
-  $('#resetForm')?.addEventListener('click', () => {
+  $('#cancelBtn')?.addEventListener('click', () => {
   
     clearForm();
   
