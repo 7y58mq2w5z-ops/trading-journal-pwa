@@ -907,25 +907,28 @@ function switchTab(name) {
   $('#cancelBtn')?.addEventListener('click', (ev) => {
     if (ev) ev.preventDefault();
 
-    console.log("현재 상태 체크 -> editModeFromDetail:", editModeFromDetail, " / lastOpenedDetail:", lastOpenedDetail);
+    // 1. 다른 함수들이 전역 변수를 청소하기 전에, 현재 상태를 로컬 변수에 미리 '백업'해 둡니다.
+    const isFromDetail = editModeFromDetail;
+    const backupDetail = lastOpenedDetail;
 
-    if (editModeFromDetail && lastOpenedDetail) {
-      console.log("상세보기 복귀 로직 진입 성공!");
-      clearForm();
-      switchTab('list');
-      
-      setTimeout(() => {
-        console.log("지금 openDetail을 실행합니다 ->", lastOpenedDetail);
-        openDetail(lastOpenedDetail);
-      }, 200);
-      
-      editModeFromDetail = false;
-      return;
-    }
-    
-    console.log("일반 입력 취소 로직으로 실행됨");
+    console.log("취소 버튼 클릭 시점 백업 상태 -> isFromDetail:", isFromDetail, " / backupDetail:", backupDetail);
+
+    // 2. 먼저 원래 흐름대로 폼을 비우고 리스트 화면으로 넘깁니다.
+    // (이제 clearForm()이나 switchTab() 내부에서 전역 변수를 가차없이 지워도 안전합니다.)
     clearForm();
     switchTab('list');
+
+    // 3. 백업해 둔 상태를 바탕으로 상세보기 복귀 여부를 결정합니다.
+    if (isFromDetail && backupDetail) {
+      console.log("상세보기 복귀 조건 만족! 0.15초 뒤 상세창을 띄웁니다.");
+      
+      setTimeout(() => {
+        openDetail(backupDetail);
+      }, 150); // 화면 전환 잔상이 끝날 수 있도록 0.15초 딜레이를 줍니다.
+    }
+
+    // 4. 전역 스위치 최종 리셋
+    editModeFromDetail = false;
   });
 
   $('#deleteTrade')?.addEventListener('click', async ()=>{
