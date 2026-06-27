@@ -904,7 +904,7 @@ function switchTab(name) {
     }
   });
 
-  // $('#cancelBtn')?.addEventListener('click', () => { clearForm(); if (lastOpenedDetail) openDetail(lastOpenedDetail); });
+  /*$('#cancelBtn')?.addEventListener('click', () => { clearForm(); if (lastOpenedDetail) openDetail(lastOpenedDetail); });
 
   $('#cancelBtn')?.addEventListener('click', (ev) => {
     if (ev) ev.preventDefault();
@@ -931,7 +931,52 @@ function switchTab(name) {
 
     // 4. 전역 스위치 최종 리셋
     editModeFromDetail = false;
-  });
+  });*/
+  // 1. 기존의 동일한 이벤트 리스너가 있다면 완전히 제거하기 위해 원본 핸들러를 따로 분리합니다.
+  function handleCancelAction(ev) {
+    if (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+
+    // [중복 실행 원천 차단] 한 번 실행되면 0.3초 동안은 다시 실행되지 않도록 잠금(디바운스)
+    if (window.isCancelProcessing) return;
+    window.isCancelProcessing = true;
+    setTimeout(() => { window.isCancelProcessing = false; }, 300);
+
+    // 다른 함수들이 전역 변수를 청소하기 전에 '가장 먼저' 로컬 변수에 백업
+    const isFromDetail = editModeFromDetail;
+    const backupDetail = lastOpenedDetail;
+
+    console.log("🎯 [실제 실행] 취소 백업 상태 -> isFromDetail:", isFromDetail, " / backupDetail:", backupDetail);
+
+    // 폼 청소 및 탭 이동
+    clearForm();
+    switchTab('list');
+
+    // 복귀 로직 판별
+    if (isFromDetail && backupDetail) {
+      console.log("✅ 상세보기 창 복귀 조건 만족! 상세창을 다시 띄웁니다.");
+      
+      setTimeout(() => {
+        openDetail(backupDetail);
+      }, 150);
+    }
+
+    // 마지막에 스위치 리셋
+    editModeFromDetail = false;
+  }
+
+  // 2. 이벤트 등록 구역 (기존 코드를 지우고 이걸로 교체하세요)
+  const cancelBtnEl = document.getElementById('cancelBtn');
+  if (cancelBtnEl) {
+    // 기존에 묶여있을지 모르는 이벤트를 완전히 청소하기 위해 element를 복제하는 가장 확실한 방법 사용
+    const newCancelBtn = cancelBtnEl.cloneNode(true);
+    cancelBtnEl.parentNode.replaceChild(newCancelBtn, cancelBtnEl);
+    
+    // 새로 태어난 깨끗한 버튼에 딱 한 번만 이벤트 연결
+    newCancelBtn.addEventListener('click', handleCancelAction);
+  }
 
   $('#deleteTrade')?.addEventListener('click', async ()=>{
     const id = Number($('#tradeForm').id.value);
