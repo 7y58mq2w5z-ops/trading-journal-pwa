@@ -903,25 +903,28 @@ function switchTab(name) {
 
   // $('#cancelBtn')?.addEventListener('click', () => { clearForm(); if (lastOpenedDetail) openDetail(lastOpenedDetail); });
 
-  $('#cancelBtn')?.addEventListener('click', () => {
-  
-    clearForm();
-  
-    // 상세보기에서 편집 들어온 경우
-    if (editModeFromDetail && lastOpenedDetail) {
-  
-      switchTab('list');
-  
+  $('#cancelBtn')?.addEventListener('click', (ev) => {
+    if (ev) ev.preventDefault(); // 폼 제출로 인한 새로고침 방지
+
+    // 1. 상세보기에서 편집으로 들어온 경우 (데이터가 아직 살아있을 때 먼저 체크)
+    if (typeof editModeFromDetail !== 'undefined' && editModeFromDetail && lastOpenedDetail) {
+      
+      clearForm(); // 조건 검사가 끝난 '후'에 안전하게 폼을 비워줍니다.
+      
+      switchTab('list'); // 리스트 탭으로 이동
+      
+      // 화면 전환 애니메이션이나 렌더링 타이밍을 위해 살짝 딜레이를 두고 상세창 오픈
       setTimeout(() => {
         openDetail(lastOpenedDetail);
       }, 100);
-  
-      editModeFromDetail = false;
-      return;
+      
+      editModeFromDetail = false; // 상태 리셋
+      return; // 함수 종료
     }
-  
-    // 일반 입력 중 취소
-    switchTab('list');
+    
+    // 2. 일반 입력 중 취소를 누른 경우
+    clearForm(); // 폼 초기화
+    switchTab('list'); // 리스트 탭으로 이동
   });
 
   $('#deleteTrade')?.addEventListener('click', async ()=>{
