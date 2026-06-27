@@ -456,6 +456,7 @@ async function openDetail(t){
     
     // 2. [핵심] 모든 청소와 세팅이 끝난 '맨 마지막'에 스위치를 당당하게 켭니다.
     editModeFromDetail = true;
+    console.log("편집 클릭:", editModeFromDetail);
     
     document.getElementById('tradeForm')
       ?.scrollIntoView({behavior:'smooth', block:'start'});
@@ -934,6 +935,7 @@ function switchTab(name) {
   });*/
   // 1. 기존의 동일한 이벤트 리스너가 있다면 완전히 제거하기 위해 원본 핸들러를 따로 분리합니다.
   function handleCancelAction(ev) {
+    console.log("취소 클릭 직전:", editModeFromDetail);
     if (ev) {
       ev.preventDefault();
       ev.stopPropagation();
