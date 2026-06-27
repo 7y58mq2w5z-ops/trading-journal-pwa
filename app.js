@@ -446,15 +446,17 @@ async function openDetail(t){
     document.getElementById('tradeForm')?.scrollIntoView({behavior:'smooth', block:'start'});
   });*/
   editBtn.addEventListener('click', ()=>{
-  
-    editModeFromDetail = true;
-  
     modal.classList.remove('show');
     document.querySelector('[data-tab="form"]')?.click();
-  
+    
+    // 1. 기존 데이터를 채워넣고 폼 모드를 변경합니다.
+    // (이 안에서 clearForm이 실행되더라도 스위치가 켜지기 전이라 안전합니다!)
     fillForm(t);
     setFormMode('edit');
-  
+    
+    // 2. [핵심] 모든 청소와 세팅이 끝난 '맨 마지막'에 스위치를 당당하게 켭니다.
+    editModeFromDetail = true;
+    
     document.getElementById('tradeForm')
       ?.scrollIntoView({behavior:'smooth', block:'start'});
   });
