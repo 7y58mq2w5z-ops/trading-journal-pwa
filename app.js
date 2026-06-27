@@ -1,3 +1,4 @@
+let editModeFromDetail = false; 
 let lastOpenedDetail = null;
 
 // ---------- 정식 Supabase Client 구성 및 초기화 ----------
