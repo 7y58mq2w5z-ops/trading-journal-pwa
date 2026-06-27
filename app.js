@@ -373,7 +373,7 @@ async function openDetail(t){
   lastOpenedDetail = t;
   const pnl = formatPnL(t), r = rate(t), buyAmount = calcBuyAmount(t);
 
-  let editModeFromDetail = false;
+  // let editModeFromDetail = false;
   
   // Supabase daily_notes 테이블에서 실시간 매칭 일기 가져오기
   const { data: noteData } = await supabase.from('daily_notes').select('*');
