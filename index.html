@@ -107,10 +107,10 @@
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
-  <div id="lockModal" class="fixed inset-0 bg-slate-900 flex items-center justify-center z-[9999]">
-    <div class="bg-white p-6 rounded-2xl w-full max-w-sm text-center shadow-xl m-4">
+  <div id="lockModal" class="fixed top-0 left-0 w-screen h-screen bg-slate-900 flex items-center justify-center z-[99999] overflow-hidden overscroll-none touch-none">
+    <div class="bg-white p-6 rounded-2xl w-full max-w-sm text-center shadow-xl m-4 z-[100000]">
       <div class="text-4xl mb-3">🔒</div>
-      <h3 class="text-xl font-bold text-slate-800 mb-1">매매일지</h3>
+      <h3 class="text-xl font-bold text-slate-800 mb-1">매매일지 잠금 해제</h3>
       <p class="text-sm text-slate-500 mb-5">비밀번호를 입력해야 접속할 수 있습니다.</p>
       
       <input type="password" id="lockPassword" 
