@@ -184,7 +184,7 @@ function fillForm(t) {
 
 // ---------- Month dropdown ----------
 async function populateMonthSelect() {
-  const toolbar = $('#searchInput')?.parentElement || null;
+  const toolbar = $('#searchInput')?.parentElement;
   if (!toolbar) return;
 
   let monthSel = $('#monthSelect');
@@ -197,27 +197,18 @@ async function populateMonthSelect() {
     monthSel.addEventListener('change', renderList);
   }
 
-  const data = await idbAll();
+  const { data } = await supabase.from('trading_logs').select('date');
+  if (!data) return;
   const months = Array.from(new Set(data.map(t=>monthKeyOf(t.date)).filter(Boolean))).sort().reverse();
   const cur = monthSel.value || 'all';
 
-  monthSel.innerHTML = '';
-  const optAll = document.createElement('option');
-  optAll.value = 'all'; optAll.textContent = '전체';
-  monthSel.appendChild(optAll);
+  monthSel.innerHTML = '<option value="all">전체</option>';
   months.forEach(key=>{
     const opt = document.createElement('option');
-    opt.value = key;
-    opt.textContent = monthLabel(key);
+    opt.value = key; opt.textContent = monthLabel(key);
     monthSel.appendChild(opt);
   });
-
   if ([...monthSel.options].some(o=>o.value===cur)) monthSel.value = cur;
-
-  const search = $('#searchInput');
-  const sort = $('#sortSelect');
-  if (search) search.style.flex = '1 1 auto';
-  if (sort) sort.style.width = '7.5rem';
 }
 
 // ---------- View counter helper ----------
@@ -227,28 +218,33 @@ async function incrementViews(id, currentViews) {
   return newViews;
 }
 // ---------- List render ----------
-let chart;
+let chart = null;
 async function renderList() {
-  // [추가] 리스트를 갱신하기 전의 현재 스크롤 위치를 기억합니다.
   const scrollPos = window.scrollY;
-
   const q = $('#searchInput')?.value?.trim().toLowerCase() || '';
   const sortKey = $('#sortSelect')?.value || 'date_desc';
-  const monthKey = $('#monthSelect') ? $('#monthSelect').value : 'all';
+  const monthKey = $('#monthSelect')?.value || 'all';
 
-  const data = await idbAll();
+  const { data } = await supabase.from('trading_logs').select('*');
+  if (!data) return;
 
   let rows = data.filter(t => {
-    const tagStr = (t.tags || '').toLowerCase();
-    const sym = (t.symbol || '').toLowerCase();
-    const okQuery = !q || tagStr.includes(q) || sym.includes(q);
+    const tagStr = Array.isArray(t.tags) ? t.tags.join(',') : (t.tags || '');
+    const okQuery = !q || tagStr.toLowerCase().includes(q) || t.symbol.toLowerCase().includes(q);
     const okMonth = monthKey === 'all' || monthKeyOf(t.date) === monthKey;
     return okQuery && okMonth;
   });
 
   rows.sort((a,b)=>{
-    if (sortKey === 'date_desc') return (b.date||'').localeCompare(a.date||'');
-    if (sortKey === 'date_asc') return (a.date||'').localeCompare(b.date||'');
+    if (sortKey === 'date_desc') {
+      const dateCmp = (b.date||'').localeCompare(a.date||'');
+      return dateCmp !== 0 ? dateCmp : (b.id - a.id);
+    }
+    
+    if (sortKey === 'date_asc') {
+      const dateCmp = (a.date||'').localeCompare(b.date||'');
+      return dateCmp !== 0 ? dateCmp : (a.id - b.id);
+    }
     if (sortKey === 'pnl_desc') return formatPnL(b) - formatPnL(a);
     if (sortKey === 'pnl_asc') return formatPnL(a) - formatPnL(b);
     return 0;
@@ -266,65 +262,56 @@ async function renderList() {
     </thead>
     <tbody>`];
 
-  let lastDate = null;
-  let alt = false;
-
+  let lastDate = null, alt = false;
   for (const t of rows) {
-    const pnl = formatPnL(t);
-    const r = rate(t);
-    const d = t.date || '';
+    const pnl = formatPnL(t), r = rate(t), d = t.date || '';
     if (d !== lastDate) { alt = !alt; lastDate = d; }
-    const rowBg = alt ? 'bg-slate-100' : 'bg-white';
-    const dateCell = d ? `${fmtDateNoYear(d)}` : '';
-
-    const symbolHtml = (t.highlight)
+    
+    const symbolHtml = t.highlight
       ? `<span class="inline-flex items-center gap-1 font-semibold max-w-full overflow-hidden">
            <span class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
-           <span class="block overflow-hidden text-ellipsis whitespace-nowrap">${t.symbol||''}</span>
+           <span class="block overflow-hidden text-ellipsis whitespace-nowrap">${t.symbol}</span>
          </span>`
-      : `<span class="block overflow-hidden text-ellipsis whitespace-nowrap">${t.symbol||''}</span>`;
+      : `<span class="block overflow-hidden text-ellipsis whitespace-nowrap">${t.symbol}</span>`;
 
-    const views = Number(t.views || 0);
-
-    table.push(`<tr class="border-t border-slate-200 cursor-pointer ${rowBg}" data-id="${t.id}">
-      <td class="py-1 pr-2 whitespace-nowrap">${dateCell}</td>
+    table.push(`<tr class="border-t border-slate-200 cursor-pointer ${alt?'bg-slate-100':'bg-white'}" data-id="${t.id}">
+      <td class="py-1 pr-2 whitespace-nowrap">${fmtDateNoYear(d)}</td>
       <td class="py-1 pr-2 w-28 max-w-28 overflow-hidden text-ellipsis whitespace-nowrap">${symbolHtml}</td>
       <td class="py-1 pr-2 text-right whitespace-nowrap">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
       <td class="py-1 pr-2 text-right whitespace-nowrap">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
-      <td class="py-1 pr-2 w-12 text-right text-slate-600 whitespace-nowrap">${fmtNumber(views)}</td>
+      <td class="py-1 pr-2 w-12 text-right text-slate-600 whitespace-nowrap">${fmtNumber(t.views||0)}</td>
     </tr>`);
   }
-
   table.push(`</tbody></table>`);
   $('#listContainer').innerHTML = table.join('');
 
-  // [중요] 리스트를 화면에 그린 직후, 기억해둔 스크롤 위치로 즉시 이동합니다.
-  requestAnimationFrame(() => {
-    window.scrollTo(0, scrollPos);
-  });
+  requestAnimationFrame(() => { window.scrollTo(0, scrollPos); });
 
   $('#listContainer').querySelectorAll('tr[data-id]').forEach(tr=>{
     tr.addEventListener('click', async ()=>{
       const id = Number(tr.getAttribute('data-id'));
-      await openDetailWithViewCount(id);
+      const targetData = data.find(x => x.id === id);
+      const updatedViews = await incrementViews(id, targetData.views);
+      targetData.views = updatedViews;
+      openDetail(targetData);
+      renderList();
     });
   });
 
-  // 차트 로직... (동일)
-  const byDate = {};
-  for (const t of data) if (t.date) byDate[t.date] = (byDate[t.date] || 0) + formatPnL(t);
-  const days = Object.keys(byDate).sort();
-  const labels = days.map(fmtDateNoYear);
-  const values = days.map(d => byDate[d]);
-
-  if (chart) chart.destroy();
-  const ctx = document.getElementById('pnlChart');
-  if (ctx) {
-    chart = new Chart(ctx, {
-      type: 'bar',
-      data: { labels, datasets: [{ label: '일별 손익 합계', data: values }] },
-      options: { responsive: true, maintainAspectRatio: false }
-    });
+  // 차트 그리기
+  if (typeof Chart !== 'undefined') {
+    const byDate = {};
+    for (const t of data) if (t.date) byDate[t.date] = (byDate[t.date] || 0) + formatPnL(t);
+    const days = Object.keys(byDate).sort();
+    if (chart) chart.destroy();
+    const ctx = document.getElementById('pnlChart');
+    if (ctx) {
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: days.map(fmtDateNoYear), datasets: [{ label: '일별 손익 합계', data: days.map(d=>byDate[d]) }] },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
   }
 }
 
