@@ -225,28 +225,20 @@
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-lg font-semibold">매매 리스트</h2>
       </div>
-      
-      <div class="grid grid-cols-3 gap-2 mb-3">
-        <input id="searchInput" class="input w-full" placeholder="종목/태그 검색">
-        <select id="monthSelect" class="input w-full">
-          <option value="all">전체 기간</option>
-        </select>
-        
-        <select id="sortSelect" class="input w-full">
+      <div class="flex gap-2 mb-2">
+        <input id="searchInput" class="input flex-1" placeholder="종목/태그 검색">
+        <select id="sortSelect" class="input w-36">
           <option value="date_desc">날짜↓</option>
           <option value="date_asc">날짜↑</option>
           <option value="pnl_desc">손익↓</option>
           <option value="pnl_asc">손익↑</option>
         </select>
       </div>
-      
       <div id="listContainer" class="overflow-x-hidden"></div>
-    
+
       <div class="card mt-4">
         <h3 class="font-semibold mb-2">간단 분석</h3>
-        <div style="position: relative; height:200px; width:100%;">
-          <canvas id="pnlChart"></canvas>
-        </div>
+        <canvas id="pnlChart" height="200"></canvas>
       </div>
     </section>
 
