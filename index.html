@@ -26,12 +26,15 @@
     .input { border:1px solid #e5e7eb; border-radius:.5rem; padding:.5rem .75rem; }
     .btn-secondary { border:1px solid #e5e7eb; border-radius:.5rem; padding:.5rem .75rem; background:#f8fafc; }
     .btn-save { background:#10b981; color:#fff; border-radius:.5rem; padding:.5rem .75rem; }
-    .btn-new, #cancelBtn {
+    
+    /* 수정: 중복 사용되던 id 선택자 통합 수정 */
+    .btn-cancel {
       background: #374151 !important; /* slate-700 */
       color: #fff !important;
       border-radius: .5rem;
       padding: .5rem .75rem;
     }
+    .btn-new { background: #374151 !important; color: #fff !important; border-radius: .5rem; padding: .5rem .75rem; }
     .btn-danger { background:#ef4444; color:#fff; border-radius:.5rem; padding:.5rem .75rem; }
     .pnl-pos { color:#dc2626; font-weight:600; }
     .pnl-neg { color:#2563eb; font-weight:600; }
@@ -40,7 +43,14 @@
     .detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap: .75rem; }
     .detail-images { grid-column: 1 / -1; display:flex; gap:.75rem; }
 
-    /* 월~금 평일 칸(.fc-day-mon ~ .fc-day-fri) 내부의 이벤트에만 적용 */
+    /* 수정: 가상 키패드가 뚫고 올라오거나 뒤가 비치는 것을 막기 위한 강력한 불투명 백그라운드 선언 */
+    #lockModal {
+      background-color: #0f172a !important; /* Tailwind bg-slate-900 원색 지정 */
+      opacity: 1 !important;
+      z-index: 999999 !important;
+    }
+
+    /* 월~금 평일 칸 내부의 이벤트에만 적용 */
     .fc-day-mon .fc-event, .fc-day-mon .fc-event-main, .fc-day-mon .fc-daygrid-event-harness,
     .fc-day-tue .fc-event, .fc-day-tue .fc-event-main, .fc-day-tue .fc-daygrid-event-harness,
     .fc-day-wed .fc-event, .fc-day-wed .fc-event-main, .fc-day-wed .fc-daygrid-event-harness,
@@ -51,7 +61,7 @@
       border: none !important;
       box-shadow: none !important;
       outline: none !important;
-      -webkit-tap-highlight-color: transparent !important; /* 평일 터치 하이라이트 제거 */
+      -webkit-tap-highlight-color: transparent !important;
     }
     
     /* 월~금 평일 이벤트 클릭 시 생기는 Overlay(덮개) 제거 */
@@ -70,23 +80,20 @@
       z-index: 2;
     }
     
-    /* 3. 날짜 박스만 콕 집어서 너비 줄이기 */
-
-    /* 선택된 캘린더 날짜 강조용 (JS에서 클래스만 붙여주면 됨) */
+    /* 선택된 캘린더 날짜 강조용 */
     .cal-selected-day {
-      background-color: rgba(59,130,246,0.16) !important; /* blue-500/15 */
+      background-color: rgba(59,130,246,0.16) !important;
       border-radius: 0.5rem;
     }
-    /* 입력창 포커스 시 자동 확대 방지 (줌 기능은 살려둠) */
+    /* 입력창 포커스 시 자동 확대 방지 */
     input[type="text"], 
     input[type="number"], 
     input[type="date"], 
     textarea, 
     select {
       font-size: 16px !important;
-      touch-action: manipulation; /* 두 번 탭해서 확대되는 동작 방지 */
+      touch-action: manipulation;
     }
-    /* 입력창 포커스 시 폰트 크기가 작으면 확대되므로 기본 크기를 16px로 맞춥니다 */
     .input, textarea {
       font-size: 16px !important;
     }
@@ -98,7 +105,6 @@
       object-fit: contain;
       touch-action: pinch-zoom; 
     }
-    /* 전체 화면 이미지 뷰어용 기본 스타일 보완 */
     #imgFullscreen { display: none; }
     #imgFullscreen.show { display: flex !important; }
     #tab-list {
@@ -106,8 +112,7 @@
     } 
   </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen">
-  <div id="lockModal" class="fixed top-0 left-0 w-screen h-screen bg-slate-900 flex items-center justify-center z-[99999] overflow-hidden overscroll-none touch-none">
+<body class="bg-slate-50 text-slate-900 min-h-screen select-none"> <div id="lockModal" class="fixed inset-0 flex items-center justify-center overflow-hidden overscroll-none touch-none">
     <div class="bg-white p-6 rounded-2xl w-full max-w-sm text-center shadow-xl m-4 z-[100000]">
       <div class="text-4xl mb-3">🔒</div>
       <h3 class="text-xl font-bold text-slate-800 mb-1">매매일지 잠금 해제</h3>
@@ -123,7 +128,8 @@
       <p id="lockError" class="text-red-500 text-xs mt-2 hidden">비밀번호가 일치하지 않습니다.</p>
     </div>
   </div>
-  <div id="app" class="max-w-3xl mx-auto p-4 pb-24">
+
+  <div id="app" class="max-w-3xl mx-auto p-4 pb-24 hidden">
     <header class="flex items-center justify-between mb-4">
      <div class="flex items-baseline gap-2">
       <h1 class="text-xl font-bold">매매일지</h1>
@@ -142,8 +148,8 @@
       <h2 class="text-lg font-semibold mb-3">거래 입력/수정</h2>
       <form id="tradeForm" class="grid grid-cols-1 gap-3">
         <input type="hidden" name="id" value="">
-        <label class="label">날짜 <input type="date" name="date" required class="input" style="width: 92% !important; box-sizing: border-box !important; height: 1.7rem !important;"></label>
-        <label class="label">종목명 <input type="text" name="symbol" required class="input" placeholder="종목명"></label>
+        <label class="label">날짜 <input type="date" name="date" required class="input w-full" style="height: 2.5rem !important; box-sizing: border-box !important;"></label>
+        <label class="label">종목명 <input type="text" name="symbol" required class="input w-full" placeholder="종목명"></label>
 
         <label class="inline-flex items-center gap-2">
           <input type="checkbox" name="highlight">
@@ -151,9 +157,9 @@
         </label>
 
         <div class="grid grid-cols-3 gap-2">
-          <label class="label">수량 <input type="number" name="qty" step="1" class="input"></label>
-          <label class="label">매수가 <input type="number" name="buy_price" step="0.01" class="input"></label>
-          <label class="label">실현손익 <input type="number" name="pnl_val" step="1" class="input"></label>
+          <label class="label">수량 <input type="number" name="qty" step="1" class="input w-full"></label>
+          <label class="label">매수가 <input type="number" name="buy_price" step="0.01" class="input w-full"></label>
+          <label class="label">실현손익 <input type="number" name="pnl_val" step="1" class="input w-full"></label>
         </div>
 
         <fieldset class="label">
@@ -209,7 +215,7 @@
 
         <div class="flex gap-2 mt-2">
           <button class="btn-save" type="submit" id="saveBtn">저장</button>
-          <button class="btn-new" type="button" id="cancelBtn">취소</button>
+          <button class="btn-cancel" type="button">새로고침</button>
           <button class="btn-danger hidden" type="button" id="deleteTrade">삭제</button>
         </div>
       </form>
@@ -238,7 +244,7 @@
       </div>
     </section>
 
-    <section id="tab-calendar" class="card">
+    <section id="tab-calendar" class="card hidden">
       <h2 class="text-lg font-semibold mb-3">손익 캘린더</h2>
       <div id="calendar"></div>
       <div id="calendarList" class="mt-4"></div>
