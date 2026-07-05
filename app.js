@@ -370,7 +370,7 @@ async function renderList() {
 
 // 현재 축적된 전체 데이터(globalTrades)를 기준으로 월선택 필터 옵션을 자동 생성하는 함수
 function updateMonthFilterOptions() {
-  const monthSelect = document.getElementById('monthFilterSelect');
+  const monthSelect = document.getElementById('monthSelect');
   if (!monthSelect) return;
 
   // 현재 선택되어 있던 값을 임시 보관
@@ -777,6 +777,11 @@ function switchTab(name) {
 
   $('#searchInput')?.addEventListener('input', renderList);
   $('#sortSelect')?.addEventListener('change', renderList);
+  // ---------- App Initialization ----------
+
+  // [수정] 월 선택 드롭다운 변경 시 실시간 반영 (HTML id="monthSelect"와 매칭)
+  $('#monthSelect')?.addEventListener('change', renderList);
+  
 
   // Submit Logic
   form?.addEventListener('submit', async (e) => {
