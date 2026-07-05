@@ -17,12 +17,10 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   }
 }
 
-// 글로벌 Supabase 인스턴스 정식 연결
 let supabase = null;
 if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 } else {
-  // 만약 라이브러리가 로드 안 되었을 때를 대비한 최소한의 방어 코드
   supabase = {
     from: () => ({
       select: async () => ({ data: null, error: 'Supabase 미초기화' }),
@@ -47,7 +45,6 @@ function rate(t) {
   return (pnl / buyAmount) * 100;
 }
 
-// 2026년 날짜 처리를 위해 년도를 제외한 포맷 유지
 function fmtDateNoYear(s){ if(!s) return ''; return s.slice(5); }
 function fmtNumber(n){ try { return Number(n).toLocaleString('ko-KR'); } catch { return String(n); } }
 function fmtMan(n){
@@ -85,82 +82,36 @@ function toggleZoomFallback(el){
 }
 
 async function compressImage(file) {
-  console.log('원본 크기:', Math.round(file.size / 1024), 'KB');
-  
   return new Promise((resolve) => {
     const img = new Image();
     const reader = new FileReader();
-
-    reader.onload = (e) => {
-      img.src = e.target.result;
-    };
-
+    reader.onload = (e) => { img.src = e.target.result; };
     img.onload = () => {
       const canvas = document.createElement('canvas');
-
       let width = img.width;
       let height = img.height;
-
       const MAX_SIZE = 1000;
 
       if (width > height && width > MAX_SIZE) {
-        height *= MAX_SIZE / width;
-        width = MAX_SIZE;
+        height *= MAX_SIZE / width; width = MAX_SIZE;
       } else if (height > MAX_SIZE) {
-        width *= MAX_SIZE / height;
-        height = MAX_SIZE;
+        width *= MAX_SIZE / height; height = MAX_SIZE;
       }
-
-      canvas.width = width;
-      canvas.height = height;
-
+      canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
 
-      canvas.toBlob(
-        (blob) => {
-      
-          const compressedFile = new File(
-            [blob],
-            file.name,
-            { type: 'image/jpeg' }
-          );
-      
-          console.log(
-            '압축 후 크기:',
-            Math.round(compressedFile.size / 1024),
-            'KB'
-          );
-      
-          resolve(compressedFile);
-        },
-        'image/jpeg',
-        0.65
-      );
+      canvas.toBlob((blob) => {
+        resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+      }, 'image/jpeg', 0.65);
     };
-
     reader.readAsDataURL(file);
   });
 }
 
-// ---------- Supabase 전용 이미지 업로드 엔진 ----------
 async function uploadImageToSupabase(file) {
-
-  console.log(
-    '업로드 크기:',
-    Math.round(file.size / 1024),
-    'KB'
-  );
-  
   if (!file) return null;
-  
-  console.log("원본 용량:", Math.round(file.size / 1024), "KB");
-
   file = await compressImage(file);
-
-  console.log("압축 후 용량:", Math.round(file.size / 1024), "KB");
-
-  
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}_${Math.random().toString(36).substring(2,7)}.${fileExt}`;
   const filePath = `journal/${fileName}`;
@@ -246,6 +197,7 @@ async function populateMonthSelect() {
     monthSel.addEventListener('change', renderList);
   }
 
+  // 최적화: 날짜 필드만 selective 조회하여 리소스 절약
   const { data } = await supabase.from('trading_logs').select('date');
   if (!data) return;
   const months = Array.from(new Set(data.map(t=>monthKeyOf(t.date)).filter(Boolean))).sort().reverse();
@@ -263,10 +215,7 @@ async function populateMonthSelect() {
 // ---------- View counter helper ----------
 async function incrementViews(id, currentViews) {
   const newViews = Number(currentViews || 0) + 1;
-  await supabase
-    .from('trading_logs')
-    .update({ views: newViews })
-    .eq('id', id);
+  await supabase.from('trading_logs').update({ views: newViews }).eq('id', id);
   return newViews;
 }
 
@@ -274,26 +223,34 @@ async function incrementViews(id, currentViews) {
 let chart = null;
 async function renderList() {
   const scrollPos = window.scrollY;
-  const q = $('#searchInput')?.value?.trim().toLowerCase() || '';
+  const q = $('#searchInput')?.value?.trim() || '';
   const sortKey = $('#sortSelect')?.value || 'date_desc';
   const monthKey = $('#monthSelect')?.value || 'all';
 
-  const { data } = await supabase.from('trading_logs').select('*');
-  if (!data) return;
+  // [성능 개선 핵심 1] 전체 조회를 지양하고, Supabase 자체 데이터베이스 필터링 조건절 사용
+  let query = supabase.from('trading_logs').select('*');
 
-  let rows = data.filter(t => {
-    const tagStr = Array.isArray(t.tags) ? t.tags.join(',') : (t.tags || '');
-    const okQuery = !q || tagStr.toLowerCase().includes(q) || t.symbol.toLowerCase().includes(q);
-    const okMonth = monthKey === 'all' || monthKeyOf(t.date) === monthKey;
-    return okQuery && okMonth;
-  });
+  if (monthKey !== 'all') {
+    // 해당 월의 시작일과 종료일 계산 후 범위 쿼리 진행
+    query = query.gte('date', `${monthKey}-01`).lte('date', `${monthKey}-31`);
+  }
+  
+  if (q) {
+    // 종목명 매칭 조건 추가 (일부 복합 조건은 데이터 구조 상 텍스트 매칭 보강 가능)
+    query = query.ilike('symbol', `%${q}%`);
+  }
 
+  const { data, error } = await query;
+  if (error || !data) return;
+
+  let rows = [...data];
+
+  // 정렬 처리
   rows.sort((a,b)=>{
     if (sortKey === 'date_desc') {
       const dateCmp = (b.date||'').localeCompare(a.date||'');
       return dateCmp !== 0 ? dateCmp : (b.id - a.id);
     }
-    
     if (sortKey === 'date_asc') {
       const dateCmp = (a.date||'').localeCompare(b.date||'');
       return dateCmp !== 0 ? dateCmp : (a.id - b.id);
@@ -340,10 +297,12 @@ async function renderList() {
 
   requestAnimationFrame(() => { window.scrollTo(0, scrollPos); });
 
+  // 클릭 이벤트 최적화 적용
   $('#listContainer').querySelectorAll('tr[data-id]').forEach(tr=>{
     tr.addEventListener('click', async ()=>{
       const id = Number(tr.getAttribute('data-id'));
       const targetData = data.find(x => x.id === id);
+      if(!targetData) return;
       const updatedViews = await incrementViews(id, targetData.views);
       targetData.views = updatedViews;
       openDetail(targetData);
@@ -351,7 +310,7 @@ async function renderList() {
     });
   });
 
-  // 차트 그리기
+  // 차트 렌더링용 집계 데이터 최적화 (불필요 조회를 생략하고 현재 가져온 상태를 활용)
   if (typeof Chart !== 'undefined') {
     const byDate = {};
     for (const t of data) if (t.date) byDate[t.date] = (byDate[t.date] || 0) + formatPnL(t);
@@ -373,14 +332,12 @@ async function openDetail(t){
   lastOpenedDetail = t;
   const pnl = formatPnL(t), r = rate(t), buyAmount = calcBuyAmount(t);
 
-  // let editModeFromDetail = false;
+  // [성능 개선 핵심 2] 전체 조회를 하지 않고, 정확히 타겟팅된 해당 날짜의 일기 1건만 조회하도록 교체
+  const { data: noteData } = await supabase.from('daily_notes').select('*').eq('date', t.date).maybeSingle();
   
-  // Supabase daily_notes 테이블에서 실시간 매칭 일기 가져오기
-  const { data: noteData } = await supabase.from('daily_notes').select('*');
-  const matchedNote = noteData?.find(n => n.date === t.date);
-  const dayMemo = matchedNote?.note_text || '기록된 일자 메모가 없습니다.';
-  const dayImg1 = matchedNote?.note_img1_url;
-  const dayImg2 = matchedNote?.note_img2_url;
+  const dayMemo = noteData?.note_text || '기록된 일자 메모가 없습니다.';
+  const dayImg1 = noteData?.note_img1_url;
+  const dayImg2 = noteData?.note_img2_url;
 
   const displayTags = Array.isArray(t.tags) ? t.tags.join(', ') : (t.tags || '');
 
@@ -414,20 +371,15 @@ async function openDetail(t){
   modal.classList.add('show');
 
   const closeBtn = document.getElementById('detailClose');
-
-  if (closeBtn) {
-    closeBtn.onclick = () => {
-      modal.classList.remove('show');
-    };
-  }
+  if (closeBtn) { closeBtn.onclick = () => { modal.classList.remove('show'); }; }
   
   function attachZoomHandler(id){
     const el = document.getElementById(id);
     if (!el) return;
-    el.addEventListener('click', async (ev)=>{
+    el.onclick = async (ev)=>{
       ev.stopPropagation();
       if (!(await tryFullscreen(el))) toggleZoomFallback(el);
-    });
+    };
   }
   attachZoomHandler('img1'); attachZoomHandler('img2'); attachZoomHandler('dayImg1'); attachZoomHandler('dayImg2');
 
@@ -438,30 +390,14 @@ async function openDetail(t){
   editBtn.style.position = 'absolute'; editBtn.style.right = '.75rem'; editBtn.style.top = '3rem';
   document.getElementById('detailClose')?.insertAdjacentElement('afterend', editBtn);
 
-  /*editBtn.addEventListener('click', ()=>{
-    modal.classList.remove('show');
-    document.querySelector('[data-tab="form"]')?.click();
-    fillForm(t);
-    setFormMode('edit');
-    document.getElementById('tradeForm')?.scrollIntoView({behavior:'smooth', block:'start'});
-  });*/
   editBtn.addEventListener('click', ()=>{
     modal.classList.remove('show');
     document.querySelector('[data-tab="form"]')?.click();
-    
-    // 1. 기존 데이터를 채워넣고 폼 모드를 변경합니다.
-    // (이 안에서 clearForm이 실행되더라도 스위치가 켜지기 전이라 안전합니다!)
     fillForm(t);
     setFormMode('edit');
-    
-    // 2. [핵심] 모든 청소와 세팅이 끝난 '맨 마지막'에 스위치를 당당하게 켭니다.
     editModeFromDetail = true;
-    console.log("편집 클릭:", editModeFromDetail);
-    
-    document.getElementById('tradeForm')
-      ?.scrollIntoView({behavior:'smooth', block:'start'});
+    document.getElementById('tradeForm')?.scrollIntoView({behavior:'smooth', block:'start'});
   });
-  
 }
 
 // ---------- Calendar Logic ----------
@@ -531,7 +467,7 @@ async function initCalendar() {
 }
 async function refreshCalendar() {
   if (!calendar) return;
-  const { data } = await supabase.from('trading_logs').select('*');
+  const { data } = await supabase.from('trading_logs').select('date, pnl_val');
   if (data) { calendar.removeAllEvents(); calendar.addEventSource(recomputeCalendarEvents(data)); }
 }
 
@@ -551,9 +487,8 @@ async function openNoteModal(dateStr) {
   if (!noteModal) return;
   $('#noteDateLabel').textContent = `${dateStr} 메모 및 이미지`;
 
-  // Supabase 에서 기존 일기 데이터 불러오기
-  const { data } = await supabase.from('daily_notes').select('*');
-  const row = data?.find(n => n.date === dateStr);
+  // [최적화 적용] 전체를 뽑지 않고 1개만 매칭해서 패치
+  const { data: row } = await supabase.from('daily_notes').select('*').eq('date', dateStr).maybeSingle();
 
   const preview1 = $('#noteImg1Preview');
   const preview2 = $('#noteImg2Preview');
@@ -561,35 +496,21 @@ async function openNoteModal(dateStr) {
   $('#noteText').value = row?.note_text || '';
   
   if (row?.note_img1_url) { 
-    preview1.src = row.note_img1_url; 
-    preview1.classList.remove('hidden'); 
-  } else { 
-    preview1.classList.add('hidden'); 
-  }
+    preview1.src = row.note_img1_url; preview1.classList.remove('hidden'); 
+  } else { preview1.classList.add('hidden'); }
   
   if (row?.note_img2_url) { 
-    preview2.src = row.note_img2_url; 
-    preview2.classList.remove('hidden'); 
-  } else { 
-    preview2.classList.add('hidden'); 
-  }
+    preview2.src = row.note_img2_url; preview2.classList.remove('hidden'); 
+  } else { preview2.classList.add('hidden'); }
 
-  // [추가] 모달이 열리고 이미지가 세팅된 직후, 클릭 시 확대/축소 이벤트 리스너를 강제로 새로 연결합니다.
   const attachNoteZoom = (el) => {
     if (!el) return;
-  
     el.onclick = (ev) => {
       ev.stopPropagation();
-  
-      console.log('확대 클릭');
-  
       openFullscreenImage(el.src);
     };
   };
-
-  attachNoteZoom(preview1);
-  attachNoteZoom(preview2);
-
+  attachNoteZoom(preview1); attachNoteZoom(preview2);
   noteModal.classList.remove('hidden');
 }
 
@@ -599,12 +520,10 @@ function setupNoteModalEvents() {
   $('#noteImg1Btn')?.addEventListener('click', () => $('#noteImg1Input').click());
   $('#noteImg2Btn')?.addEventListener('click', () => $('#noteImg2Input').click());
 
-  // 정식 Supabase SDK 문법 교정 (.eq 체이닝)
   $('#noteText')?.addEventListener('blur', async () => {
     if (!currentNoteDate) return;
     const txt = $('#noteText').value;
-    const { data } = await supabase.from('daily_notes').select('*');
-    const exist = data?.find(n => n.date === currentNoteDate);
+    const { data: exist } = await supabase.from('daily_notes').select('id').eq('date', currentNoteDate).maybeSingle();
 
     if (exist) {
       await supabase.from('daily_notes').update({ note_text: txt }).eq('id', exist.id);
@@ -622,7 +541,6 @@ function setupNoteModalEvents() {
 
       previewEl.src = uploadedUrl; previewEl.classList.remove('hidden');
 
-      // [추가] 방금 업로드되어 바뀐 이미지에도 클릭 이벤트 리스너를 한 번 더 갱신해 줍니다.
       previewEl.onclick = async (ev) => {
         ev.stopPropagation();
         if (typeof tryFullscreen === 'function') {
@@ -632,8 +550,7 @@ function setupNoteModalEvents() {
         }
       };
 
-      const { data } = await supabase.from('daily_notes').select('*');
-      const exist = data?.find(n => n.date === currentNoteDate);
+      const { data: exist } = await supabase.from('daily_notes').select('id').eq('date', currentNoteDate).maybeSingle();
       const payload = {}; payload[fieldName] = uploadedUrl;
 
       if (exist) await supabase.from('daily_notes').update(payload).eq('id', exist.id);
@@ -644,62 +561,37 @@ function setupNoteModalEvents() {
   handleNoteImg($('#noteImg1Input'), $('#noteImg1Preview'), 'note_img1_url');
   handleNoteImg($('#noteImg2Input'), $('#noteImg2Preview'), 'note_img2_url');
 
-  //$('#noteImg1Preview')?.addEventListener('click', () => openFullscreenImage($('#noteImg1Preview').src));
-  //$('#noteImg2Preview')?.addEventListener('click', () => openFullscreenImage($('#noteImg2Preview').src));
   document.getElementById('noteImg1Preview')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    openFullscreenImage(e.target.src);
+    e.stopPropagation(); openFullscreenImage(e.target.src);
   });
-  
   document.getElementById('noteImg2Preview')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    openFullscreenImage(e.target.src);
+    e.stopPropagation(); openFullscreenImage(e.target.src);
   });
   document.getElementById('imgFullscreen')?.addEventListener('click', () => {
     closeFullscreenImage();
   });
-  $('#imgFullscreen')?.addEventListener('click', () => {
-  $('#imgFullscreen').classList.add('hidden');
-  $('#imgFullscreen').classList.remove('flex');
-  });
 }
+
 function openFullscreenImage(src) {
   const wrap = document.getElementById('imgFullscreen');
   const img = document.getElementById('imgFullscreenImg');
-
   if (!wrap || !img || !src) return;
-
   img.src = src;
-
   wrap.classList.remove('hidden');
   wrap.style.display = 'flex';
 }
 
 function closeFullscreenImage() {
   const wrap = document.getElementById('imgFullscreen');
-
   if (!wrap) return;
-
   wrap.classList.add('hidden');
   wrap.style.display = 'none';
 }
-/*
-function openFullscreenImage(src) {
-  const modal = $('#imgFullscreen');
-  const img = $('#imgFullscreenImg');
 
-  if (!modal || !img || !src) return;
-
-  img.src = src;
-
-  modal.classList.remove('hidden');
-  modal.classList.add('flex');
-}
-*/
 // ---------- Calendar List View ----------
 async function renderCalendarList(dateStr) {
-  const { data } = await supabase.from('trading_logs').select('*');
-  const rows = (data || []).filter(t => t.date === dateStr).sort((a,b)=> (a.created_at||'').localeCompare(b.created_at||''));
+  const { data } = await supabase.from('trading_logs').select('*').eq('date', dateStr);
+  const rows = (data || []).sort((a,b)=> (a.created_at||'').localeCompare(b.created_at||''));
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
 
   const headerHtml = `<div class="card"><h3 class="font-semibold flex justify-between items-center">
@@ -724,7 +616,8 @@ async function renderCalendarList(dateStr) {
   $('#calendarList').querySelectorAll('.link-symbol').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = Number(btn.getAttribute('data-id'));
-      const found = data.find(x => x.id === id);
+      const found = rows.find(x => x.id === id);
+      if(!found) return;
       await incrementViews(id, found.views);
       found.views = Number(found.views || 0) + 1;
       openDetail(found);
@@ -735,8 +628,8 @@ async function renderCalendarList(dateStr) {
 }
 
 async function renderWeekList(sKey, eKey) {
-  const { data } = await supabase.from('trading_logs').select('*');
-  const rows = (data || []).filter(t => t.date >= sKey && t.date <= eKey).sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  const { data } = await supabase.from('trading_logs').select('*').gte('date', sKey).lte('date', eKey);
+  const rows = (data || []).sort((a,b)=> (a.date||'').localeCompare(b.date||''));
   const total = rows.reduce((acc, t)=> acc + formatPnL(t), 0);
 
   const out = [`<div class="card"><h3 class="font-semibold">${sKey} ~ ${eKey} 주간 매매 (합계: ${total>=0?`<span class='pnl-pos'>${fmtNumber(Math.round(total))}</span>`:`<span class='pnl-neg'>${fmtNumber(Math.round(total))}</span>`})</h3>`, `<table class="min-w-full text-sm mt-2"><thead class="text-slate-500"><tr><th class="py-1 pr-3 nowrap">날짜</th><th class="py-1 pr-3 nowrap">종목</th><th class="py-1 pr-3 nowrap text-right">수익률</th><th class="py-1 pr-3 nowrap text-right">손익</th><th class="py-1 pr-3 nowrap">태그</th></tr></thead><tbody>`];
@@ -758,7 +651,8 @@ async function renderWeekList(sKey, eKey) {
   $('#calendarList').querySelectorAll('.link-symbol').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = Number(btn.getAttribute('data-id'));
-      const found = data.find(x => x.id === id);
+      const found = rows.find(x => x.id === id);
+      if(!found) return;
       await incrementViews(id, found.views);
       found.views = Number(found.views || 0) + 1;
       openDetail(found);
@@ -777,10 +671,8 @@ function switchTab(name) {
   if (name === 'calendar') {
     setTimeout(() => calendar?.updateSize(), 50);
   }
-
   if (name === 'list' && !$('#tradeForm').id.value) renderList();
 }
-
 
 // ---------- Init ----------
 (async function init() {
@@ -788,15 +680,9 @@ function switchTab(name) {
   switchTab('list');
   
   if (SUPABASE_URL && SUPABASE_KEY) {
-    
     await populateMonthSelect();
     await renderList();
-    
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: 'instant'
-    });
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }
 
   const form = $('#tradeForm');
@@ -825,8 +711,8 @@ function switchTab(name) {
       let savedTrade = null;
   
       if (editId) {
-        const { data } = await supabase.from('trading_logs').select('*');
-        existingRecord = data?.find(x => x.id === editId);
+        const { data } = await supabase.from('trading_logs').select('*').eq('id', editId).maybeSingle();
+        existingRecord = data;
       }
   
       let url1 = existingRecord?.image1_url || null;
@@ -836,7 +722,6 @@ function switchTab(name) {
         const compressed1 = await compressImage(f.image1.files[0]);
         url1 = await uploadImageToSupabase(compressed1);
       }
-  
       if (f.image2?.files?.[0]) {
         const compressed2 = await compressImage(f.image2.files[0]);
         url2 = await uploadImageToSupabase(compressed2);
@@ -861,123 +746,50 @@ function switchTab(name) {
       };
   
       if (editId) {
-  
-        await supabase
-          .from('trading_logs')
-          .update(payload)
-          .eq('id', editId);
-  
-        savedTrade = {
-          ...existingRecord,
-          ...payload,
-          id: editId
-        };
-  
+        await supabase.from('trading_logs').update(payload).eq('id', editId);
+        savedTrade = { ...existingRecord, ...payload, id: editId };
         alert('수정이 완료되었습니다.');
-  
       } else {
-  
         payload.created_at = new Date().toISOString();
-  
-        const { data: insertedData } = await supabase
-          .from('trading_logs')
-          .insert(payload)
-          .select()
-          .single();
-  
+        const { data: insertedData } = await supabase.from('trading_logs').insert(payload).select().single();
         savedTrade = insertedData;
-  
         alert('저장 완료');
       }
   
       await renderList();
       await refreshCalendar();
-      
       clearForm(); 
       switchTab('list');
   
-      if (savedTrade) {
-        openDetail(savedTrade);
-      }
-  
+      if (savedTrade) { openDetail(savedTrade); }
     } catch (err) {
       console.error(err);
       alert("처리 중 에러가 발생했습니다.");
     }
   });
 
-  /*$('#cancelBtn')?.addEventListener('click', () => { clearForm(); if (lastOpenedDetail) openDetail(lastOpenedDetail); });
-
-  $('#cancelBtn')?.addEventListener('click', (ev) => {
-    if (ev) ev.preventDefault();
-
-    // 1. 다른 함수들이 전역 변수를 청소하기 전에, 현재 상태를 로컬 변수에 미리 '백업'해 둡니다.
-    const isFromDetail = editModeFromDetail;
-    const backupDetail = lastOpenedDetail;
-
-    console.log("취소 버튼 클릭 시점 백업 상태 -> isFromDetail:", isFromDetail, " / backupDetail:", backupDetail);
-
-    // 2. 먼저 원래 흐름대로 폼을 비우고 리스트 화면으로 넘깁니다.
-    // (이제 clearForm()이나 switchTab() 내부에서 전역 변수를 가차없이 지워도 안전합니다.)
-    clearForm();
-    switchTab('list');
-
-    // 3. 백업해 둔 상태를 바탕으로 상세보기 복귀 여부를 결정합니다.
-    if (isFromDetail && backupDetail) {
-      console.log("상세보기 복귀 조건 만족! 0.15초 뒤 상세창을 띄웁니다.");
-      
-      setTimeout(() => {
-        openDetail(backupDetail);
-      }, 150); // 화면 전환 잔상이 끝날 수 있도록 0.15초 딜레이를 줍니다.
-    }
-
-    // 4. 전역 스위치 최종 리셋
-    editModeFromDetail = false;
-  });*/
-  // 1. 기존의 동일한 이벤트 리스너가 있다면 완전히 제거하기 위해 원본 핸들러를 따로 분리합니다.
   function handleCancelAction(ev) {
-    console.log("취소 클릭 직전:", editModeFromDetail);
-    if (ev) {
-      ev.preventDefault();
-      ev.stopPropagation();
-    }
-
-    // [중복 실행 원천 차단] 한 번 실행되면 0.3초 동안은 다시 실행되지 않도록 잠금(디바운스)
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
     if (window.isCancelProcessing) return;
     window.isCancelProcessing = true;
     setTimeout(() => { window.isCancelProcessing = false; }, 300);
 
-    // 다른 함수들이 전역 변수를 청소하기 전에 '가장 먼저' 로컬 변수에 백업
     const isFromDetail = editModeFromDetail;
     const backupDetail = lastOpenedDetail;
 
-    console.log("🎯 [실제 실행] 취소 백업 상태 -> isFromDetail:", isFromDetail, " / backupDetail:", backupDetail);
-
-    // 폼 청소 및 탭 이동
     clearForm();
     switchTab('list');
 
-    // 복귀 로직 판별
     if (isFromDetail && backupDetail) {
-      console.log("✅ 상세보기 창 복귀 조건 만족! 상세창을 다시 띄웁니다.");
-      
-      setTimeout(() => {
-        openDetail(backupDetail);
-      }, 150);
+      setTimeout(() => { openDetail(backupDetail); }, 150);
     }
-
-    // 마지막에 스위치 리셋
     editModeFromDetail = false;
   }
 
-  // 2. 이벤트 등록 구역 (기존 코드를 지우고 이걸로 교체하세요)
   const cancelBtnEl = document.getElementById('cancelBtn');
   if (cancelBtnEl) {
-    // 기존에 묶여있을지 모르는 이벤트를 완전히 청소하기 위해 element를 복제하는 가장 확실한 방법 사용
     const newCancelBtn = cancelBtnEl.cloneNode(true);
     cancelBtnEl.parentNode.replaceChild(newCancelBtn, cancelBtnEl);
-    
-    // 새로 태어난 깨끗한 버튼에 딱 한 번만 이벤트 연결
     newCancelBtn.addEventListener('click', handleCancelAction);
   }
 
@@ -993,12 +805,11 @@ function switchTab(name) {
     }
   });
 
-  // 안전한 구동을 위해 캘린더와 노트 이벤트를 초기화 마지막 단계로 조정
   await initCalendar();
   setupNoteModalEvents();
-
 })();
-// ---------- 앱 잠금번호 설정 (원하는 4자리 숫자로 변경하세요) ----------
+
+// ---------- 앱 잠금번호 설정 ----------
 const APP_PASSWORD = "9410"; 
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1007,15 +818,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const unlockBtn = document.getElementById('lockUnlockBtn');
   const errorMsg = document.getElementById('lockError');
 
-  // 잠금 해제 인증 함수
   function checkPassword() {
     if (passwordInput.value === APP_PASSWORD) {
-      // 비밀번호가 맞으면 모달을 부드럽게 숨김 처리
       lockModal.style.setProperty('display', 'none', 'important');
-      passwordInput.value = ''; // 입력창 초기화
+      passwordInput.value = '';
       errorMsg.classList.add('hidden');
     } else {
-      // 틀리면 에러 메시지 노출 및 진동 효과(모바일 지원 시)
       errorMsg.classList.remove('hidden');
       passwordInput.value = '';
       passwordInput.focus();
@@ -1023,18 +831,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 버튼 클릭 시 체크
   unlockBtn?.addEventListener('click', checkPassword);
-
-  // 엔터 키 입력 시 체크
   passwordInput?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') checkPassword();
   });
-
-  // 숫자가 4자리 다 차면 버튼 안 눌러도 자동으로 체크하는 편의 기능
   passwordInput?.addEventListener('input', () => {
     if (passwordInput.value.length === 4) {
-      // 키보드가 내려갈 시간을 주기 위해 0.1초 뒤 실행
       setTimeout(checkPassword, 100);
     }
   });
