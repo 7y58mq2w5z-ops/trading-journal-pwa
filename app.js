@@ -218,7 +218,6 @@ async function incrementViews(id, currentViews) {
   await supabase.from('trading_logs').update({ views: newViews }).eq('id', id);
   return newViews;
 }
-
 // ---------- List render ----------
 let chart = null;
 async function renderList() {
@@ -369,7 +368,6 @@ async function renderList() {
     }
   }
 }
-
 // ---------- Detail Modal ----------
 async function openDetail(t){
   lastOpenedDetail = t;
