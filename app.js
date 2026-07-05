@@ -182,7 +182,7 @@ function fillForm(t) {
   if (span2) span2.textContent = t.image2_url ? '이미지 저장됨' : '파일 선택';
 }
 
-// ---------- Month dropdown ----------
+/*// ---------- Month dropdown ----------
 async function populateMonthSelect() {
   const toolbar = $('#searchInput')?.parentElement;
   if (!toolbar) return;
@@ -210,7 +210,7 @@ async function populateMonthSelect() {
     monthSel.appendChild(opt);
   });
   if ([...monthSel.options].some(o=>o.value===cur)) monthSel.value = cur;
-}
+}*/
 
 // ---------- View counter helper ----------
 async function incrementViews(id, currentViews) {
