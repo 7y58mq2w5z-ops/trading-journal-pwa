@@ -182,7 +182,7 @@ function fillForm(t) {
   if (span2) span2.textContent = t.image2_url ? '이미지 저장됨' : '파일 선택';
 }
 
-// ---------- Month dropdown (중복 및 서버 조회 제거 최적화) ----------
+/*// ---------- Month dropdown (중복 및 서버 조회 제거 최적화) ----------
 function populateMonthSelect(tradesArray) {
   const monthSel = $('#monthSelect');
   if (!monthSel) return;
@@ -217,7 +217,7 @@ function populateMonthSelect(tradesArray) {
   } else {
     monthSel.value = 'all';
   }
-}
+}*/
 
 // ---------- View counter helper ----------
 async function incrementViews(id, currentViews) {
