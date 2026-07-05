@@ -1009,8 +1009,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function checkPassword() {
     if (passwordInput.value === APP_PASSWORD) {
       // 비밀번호가 맞으면 모달을 부드럽게 숨김 처리
-      // 💡 [핵심 추가] 비밀번호가 맞을 때만 메인 화면을 비로소 보여줍니다!
-      document.getElementById('mainAppContainer')?.classList.remove('hidden'); 
       lockModal.style.setProperty('display', 'none', 'important');
       passwordInput.value = ''; // 입력창 초기화
       errorMsg.classList.add('hidden');
