@@ -223,36 +223,62 @@ async function incrementViews(id, currentViews) {
 let chart = null;
 async function renderList() {
   const scrollPos = window.scrollY;
-  const q = $('#searchInput')?.value?.trim() || '';
+  const q = $('#searchInput')?.value?.trim().toLowerCase() || '';
   const sortKey = $('#sortSelect')?.value || 'date_desc';
-  const monthKey = $('#monthSelect')?.value || 'all';
+  const monthKey = $('#monthSelect')?.value || 'all'; // 형태: "2026-05" 또는 "all"
 
-  // [성능 개선 핵심 1] 전체 조회를 지양하고, Supabase 자체 데이터베이스 필터링 조건절 사용
+  // [성능 개선 1] Supabase 기본 쿼리 생성
   let query = supabase.from('trading_logs').select('*');
 
+  // [월단위 검색 오류 수정] 하드코딩된 -31을 제거하고 해당 월의 안전한 범위 지정
   if (monthKey !== 'all') {
-    // 해당 월의 시작일과 종료일 계산 후 범위 쿼리 진행
-    query = query.gte('date', `${monthKey}-01`).lte('date', `${monthKey}-31`);
-  }
-  
-  if (q) {
-    // 종목명 매칭 조건 추가 (일부 복합 조건은 데이터 구조 상 텍스트 매칭 보강 가능)
-    query = query.ilike('symbol', `%${q}%`);
+    // 30일/31일/윤달 상관없이 안전하게 해당 월 전체를 쿼리하기 위해 다음 달 1일 미만(<) 조건 사용
+    const [year, month] = monthKey.split('-').map(Number);
+    const startDate = `${monthKey}-01`;
+    
+    let nextYear = year;
+    let nextMonth = month + 1;
+    if (nextMonth > 12) {
+      nextMonth = 1;
+      nextYear += 1;
+    }
+    const nextMonthStr = String(nextMonth).padStart(2, '0');
+    const endDateBoundary = `${nextYear}-${nextMonthStr}-01`;
+
+    // gte(이동일 이상) 이고 lt(다음달 1일 미만) 이면 30일이든 31일이든 완벽하게 조회됨
+    query = query.gte('date', startDate).lt('date', endDateBoundary);
   }
 
+  // 데이터 가져오기 (태그 필터링을 JavaScript에서 유연하게 하기 위해 종목 쿼리는 대소문자 무시 결합 가능)
   const { data, error } = await query;
   if (error || !data) return;
 
+  // [태그 및 종목명 검색 통합 처리] 자바스크립트 단에서 정밀하게 필터링
   let rows = [...data];
+  if (q) {
+    rows = rows.filter(t => {
+      const symbolMatch = t.symbol ? t.symbol.toLowerCase().includes(q) : false;
+      
+      // tags가 배열, 문자열, 혹은 없는 경우를 모두 안전하게 체크
+      let tagMatch = false;
+      if (Array.isArray(t.tags)) {
+        tagMatch = t.tags.some(tag => tag.toLowerCase().includes(q));
+      } else if (typeof t.tags === 'string') {
+        tagMatch = t.tags.toLowerCase().includes(q);
+      }
+
+      return symbolMatch || tagMatch;
+    });
+  }
 
   // 정렬 처리
-  rows.sort((a,b)=>{
+  rows.sort((a, b) => {
     if (sortKey === 'date_desc') {
-      const dateCmp = (b.date||'').localeCompare(a.date||'');
+      const dateCmp = (b.date || '').localeCompare(a.date || '');
       return dateCmp !== 0 ? dateCmp : (b.id - a.id);
     }
     if (sortKey === 'date_asc') {
-      const dateCmp = (a.date||'').localeCompare(b.date||'');
+      const dateCmp = (a.date || '').localeCompare(b.date || '');
       return dateCmp !== 0 ? dateCmp : (a.id - b.id);
     }
     if (sortKey === 'pnl_desc') return formatPnL(b) - formatPnL(a);
@@ -260,6 +286,7 @@ async function renderList() {
     return 0;
   });
 
+  // 테이블 생성 로직
   const table = [`<table class="min-w-full table-fixed text-xs">
     <thead class="text-slate-500">
       <tr>
@@ -284,12 +311,13 @@ async function renderList() {
          </span>`
       : `<span class="block overflow-hidden text-ellipsis whitespace-nowrap">${t.symbol}</span>`;
 
-    table.push(`<tr class="border-t border-slate-200 cursor-pointer ${alt?'bg-slate-100':'bg-white'}" data-id="${t.id}">
+    // 태그가 존재할 경우 화면 종목명 밑이나 옆에 작게 노출하고 싶다면 템플릿 리터럴에 포함 가능 (현재는 기존 유지)
+    table.push(`<tr class="border-t border-slate-200 cursor-pointer ${alt ? 'bg-slate-100' : 'bg-white'}" data-id="${t.id}">
       <td class="py-1 pr-2 whitespace-nowrap">${fmtDateNoYear(d)}</td>
       <td class="py-1 pr-2 w-28 max-w-28 overflow-hidden text-ellipsis whitespace-nowrap">${symbolHtml}</td>
-      <td class="py-1 pr-2 text-right whitespace-nowrap">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
-      <td class="py-1 pr-2 text-right whitespace-nowrap">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
-      <td class="py-1 pr-2 w-12 text-right text-slate-600 whitespace-nowrap">${fmtNumber(t.views||0)}</td>
+      <td class="py-1 pr-2 text-right whitespace-nowrap">${r >= 0 ? `<span class="pnl-pos">${r.toFixed(2)}%</span>` : `<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
+      <td class="py-1 pr-2 text-right whitespace-nowrap">${pnl >= 0 ? `<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>` : `<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
+      <td class="py-1 pr-2 w-12 text-right text-slate-600 whitespace-nowrap class-views">${fmtNumber(t.views || 0)}</td>
     </tr>`);
   }
   table.push(`</tbody></table>`);
@@ -297,30 +325,45 @@ async function renderList() {
 
   requestAnimationFrame(() => { window.scrollTo(0, scrollPos); });
 
-  // 클릭 이벤트 최적화 적용
-  $('#listContainer').querySelectorAll('tr[data-id]').forEach(tr=>{
-    tr.addEventListener('click', async ()=>{
+  // 클릭 이벤트 최적화 (재렌더링 무한루프 제거 및 메모리 내 데이터 즉시 반영)
+  $('#listContainer').querySelectorAll('tr[data-id]').forEach(tr => {
+    tr.addEventListener('click', async () => {
       const id = Number(tr.getAttribute('data-id'));
-      const targetData = data.find(x => x.id === id);
-      if(!targetData) return;
+      const targetData = rows.find(x => x.id === id); // 현재 필터링된 리스트에서 찾기
+      if (!targetData) return;
+      
+      // 조회수 증가 애니메이션 체감 속도를 위해 서버 통신 전에 화면 UI 숫자 먼저 1 올림
+      const viewTd = tr.querySelector('.class-views');
+      if (viewTd) viewTd.textContent = fmtNumber((targetData.views || 0) + 1);
+
+      // 데이터 백엔드 전송
       const updatedViews = await incrementViews(id, targetData.views);
       targetData.views = updatedViews;
+      
+      // 상세 팝업 열기
       openDetail(targetData);
-      renderList();
+      
+      // 버그 수정: 여기서 renderList()를 다시 호출하면 전체 데이터를 새로 긁어오므로 
+      // 재호출을 과감히 생략하여 속도를 비약적으로 향상시킵니다.
     });
   });
 
-  // 차트 렌더링용 집계 데이터 최적화 (불필요 조회를 생략하고 현재 가져온 상태를 활용)
+  // 차트 렌더링용 집계 데이터 최적화 (현재 필터링되어 화면에 보이는 rows 데이터 기반 구축)
   if (typeof Chart !== 'undefined') {
     const byDate = {};
-    for (const t of data) if (t.date) byDate[t.date] = (byDate[t.date] || 0) + formatPnL(t);
+    for (const t of rows) {
+      if (t.date) byDate[t.date] = (byDate[t.date] || 0) + formatPnL(t);
+    }
     const days = Object.keys(byDate).sort();
     if (chart) chart.destroy();
     const ctx = document.getElementById('pnlChart');
     if (ctx) {
       chart = new Chart(ctx, {
         type: 'bar',
-        data: { labels: days.map(fmtDateNoYear), datasets: [{ label: '일별 손익 합계', data: days.map(d=>byDate[d]) }] },
+        data: { 
+          labels: days.map(fmtDateNoYear), 
+          datasets: [{ label: '일별 손익 합계', data: days.map(d => byDate[d]), backgroundColor: days.map(d => byDate[d] >= 0 ? '#ef4444' : '#3b82f6') }] 
+        },
         options: { responsive: true, maintainAspectRatio: false }
       });
     }
