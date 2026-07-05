@@ -182,35 +182,42 @@ function fillForm(t) {
   if (span2) span2.textContent = t.image2_url ? '이미지 저장됨' : '파일 선택';
 }
 
-/*// ---------- Month dropdown ----------
-async function populateMonthSelect() {
-  const toolbar = $('#searchInput')?.parentElement;
-  if (!toolbar) return;
+// ---------- Month dropdown (중복 및 서버 조회 제거 최적화) ----------
+function populateMonthSelect(tradesArray) {
+  const monthSel = $('#monthSelect');
+  if (!monthSel) return;
 
-  let monthSel = $('#monthSelect');
-  if (!monthSel) {
-    monthSel = document.createElement('select');
-    monthSel.id = 'monthSelect';
-    monthSel.className = 'input';
-    monthSel.style.width = '7.5rem';
-    toolbar.appendChild(monthSel);
-    monthSel.addEventListener('change', renderList);
-  }
-
-  // 최적화: 날짜 필드만 selective 조회하여 리소스 절약
-  const { data } = await supabase.from('trading_logs').select('date');
-  if (!data) return;
-  const months = Array.from(new Set(data.map(t=>monthKeyOf(t.date)).filter(Boolean))).sort().reverse();
+  // 기존에 사용자가 선택하고 있던 달(월)을 기억
   const cur = monthSel.value || 'all';
 
-  monthSel.innerHTML = '<option value="all">전체</option>';
-  months.forEach(key=>{
+  // [속도 개선] 서버에서 새로 select 하지 않고, 이미 불러온 데이터(tradesArray)를 재활용합니다.
+  const targetData = tradesArray && tradesArray.length ? tradesArray : (globalTrades || []);
+  
+  const months = Array.from(
+    new Set(targetData.map(t => t.date ? t.date.substring(0, 7) : null).filter(Boolean))
+  ).sort().reverse();
+
+  // 첫 번째 기본 옵션을 '전체 기간'으로 빌드 (HTML 디자인 공간 낭비 방지)
+  monthSel.innerHTML = '<option value="all">전체 기간</option>';
+  
+  months.forEach(key => {
     const opt = document.createElement('option');
-    opt.value = key; opt.textContent = monthLabel(key);
+    opt.value = key; 
+    
+    // "2026-05" -> "2026년 05월" 포맷 변환
+    const [year, month] = key.split('-');
+    opt.textContent = `${year}년 ${month}월`;
+    
     monthSel.appendChild(opt);
   });
-  if ([...monthSel.options].some(o=>o.value===cur)) monthSel.value = cur;
-}*/
+
+  // 이전에 선택했던 값이 새 목록에도 존재하면 선택 상태를 유지시킵니다.
+  if ([...monthSel.options].some(o => o.value === cur)) {
+    monthSel.value = cur;
+  } else {
+    monthSel.value = 'all';
+  }
+}
 
 // ---------- View counter helper ----------
 async function incrementViews(id, currentViews) {
@@ -224,14 +231,15 @@ async function renderList() {
   const scrollPos = window.scrollY;
   const q = $('#searchInput')?.value?.trim().toLowerCase() || '';
   const sortKey = $('#sortSelect')?.value || 'date_desc';
-  const monthKey = $('#monthFilterSelect')?.value || 'all';
+  
+  // [수정]: ID를 고유하게 'monthSelect'로 통일하여 매핑 오류 방지
+  const monthKey = $('#monthSelect')?.value || 'all';
 
   // [성능 개선 1] Supabase 기본 쿼리 생성
   let query = supabase.from('trading_logs').select('*');
 
-  // [월단위 검색 오류 수정] 하드코딩된 -31을 제거하고 해당 월의 안전한 범위 지정
+  // [월단위 검색 오류 수정] 안전한 범위 지정 lt(<) 연산 사용
   if (monthKey !== 'all') {
-    // 30일/31일/윤달 상관없이 안전하게 해당 월 전체를 쿼리하기 위해 다음 달 1일 미만(<) 조건 사용
     const [year, month] = monthKey.split('-').map(Number);
     const startDate = `${monthKey}-01`;
     
@@ -244,11 +252,10 @@ async function renderList() {
     const nextMonthStr = String(nextMonth).padStart(2, '0');
     const endDateBoundary = `${nextYear}-${nextMonthStr}-01`;
 
-    // gte(이동일 이상) 이고 lt(다음달 1일 미만) 이면 30일이든 31일이든 완벽하게 조회됨
     query = query.gte('date', startDate).lt('date', endDateBoundary);
   }
 
-  // 데이터 가져오기 (태그 필터링을 JavaScript에서 유연하게 하기 위해 종목 쿼리는 대소문자 무시 결합 가능)
+  // 데이터 가져오기
   const { data, error } = await query;
   if (error || !data) return;
 
@@ -258,7 +265,6 @@ async function renderList() {
     rows = rows.filter(t => {
       const symbolMatch = t.symbol ? t.symbol.toLowerCase().includes(q) : false;
       
-      // tags가 배열, 문자열, 혹은 없는 경우를 모두 안전하게 체크
       let tagMatch = false;
       if (Array.isArray(t.tags)) {
         tagMatch = t.tags.some(tag => tag.toLowerCase().includes(q));
@@ -310,7 +316,6 @@ async function renderList() {
          </span>`
       : `<span class="block overflow-hidden text-ellipsis whitespace-nowrap">${t.symbol}</span>`;
 
-    // 태그가 존재할 경우 화면 종목명 밑이나 옆에 작게 노출하고 싶다면 템플릿 리터럴에 포함 가능 (현재는 기존 유지)
     table.push(`<tr class="border-t border-slate-200 cursor-pointer ${alt ? 'bg-slate-100' : 'bg-white'}" data-id="${t.id}">
       <td class="py-1 pr-2 whitespace-nowrap">${fmtDateNoYear(d)}</td>
       <td class="py-1 pr-2 w-28 max-w-28 overflow-hidden text-ellipsis whitespace-nowrap">${symbolHtml}</td>
@@ -324,30 +329,24 @@ async function renderList() {
 
   requestAnimationFrame(() => { window.scrollTo(0, scrollPos); });
 
-  // 클릭 이벤트 최적화 (재렌더링 무한루프 제거 및 메모리 내 데이터 즉시 반영)
+  // 클릭 이벤트 최적화
   $('#listContainer').querySelectorAll('tr[data-id]').forEach(tr => {
     tr.addEventListener('click', async () => {
       const id = Number(tr.getAttribute('data-id'));
-      const targetData = rows.find(x => x.id === id); // 현재 필터링된 리스트에서 찾기
+      const targetData = rows.find(x => x.id === id);
       if (!targetData) return;
       
-      // 조회수 증가 애니메이션 체감 속도를 위해 서버 통신 전에 화면 UI 숫자 먼저 1 올림
       const viewTd = tr.querySelector('.class-views');
       if (viewTd) viewTd.textContent = fmtNumber((targetData.views || 0) + 1);
 
-      // 데이터 백엔드 전송
       const updatedViews = await incrementViews(id, targetData.views);
       targetData.views = updatedViews;
       
-      // 상세 팝업 열기
       openDetail(targetData);
-      
-      // 버그 수정: 여기서 renderList()를 다시 호출하면 전체 데이터를 새로 긁어오므로 
-      // 재호출을 과감히 생략하여 속도를 비약적으로 향상시킵니다.
     });
   });
 
-  // 차트 렌더링용 집계 데이터 최적화 (현재 필터링되어 화면에 보이는 rows 데이터 기반 구축)
+  // 차트 렌더링용 집계 데이터 최적화
   if (typeof Chart !== 'undefined') {
     const byDate = {};
     for (const t of rows) {
@@ -368,42 +367,39 @@ async function renderList() {
     }
   }
 }
-// 현재 축적된 전체 데이터(globalTrades)를 기준으로 월선택 필터 옵션을 자동 생성하는 함수
+
+// [수정 완료] 드롭다운 목록 내부에 '전체 기간' 선택지를 포함하도록 개선한 함수
 function updateMonthFilterOptions() {
-  const monthSelect = document.getElementById('monthFilterSelect');
+  const monthSelect = document.getElementById('monthSelect');
   if (!monthSelect) return;
 
-  // 현재 선택되어 있던 값을 임시 보관
-  const currentValue = monthSelect.value;
+  const currentValue = monthSelect.value || 'all';
 
   // 데이터에서 중복 없는 YYYY-MM 추출
   const monthsSet = new Set();
   globalTrades.forEach(trade => {
     if (trade.date && trade.date.length >= 7) {
-      monthsSet.add(trade.date.substring(0, 7)); // "2026-05" 형태로 추출됨
+      monthsSet.add(trade.date.substring(0, 7));
     }
   });
 
-  // 정렬 (최신 달이 위로 오게 하려면 오름차순/내림차순 정렬)
+  // 최신 달이 위로 오도록 내림차순 정렬
   const sortedMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
 
-  // HTML 옵션 초기화 (전체 기간은 고정)
-  let optionsHtml = '';
+  // [수정]: 아무 동작 안 하던 외부 텍스트 영역을 없애는 대신, 셀렉트 박스 내부 첫 옵션으로 '전체 기간'을 추가합니다.
+  let optionsHtml = '<option value="all">전체 기간</option>';
   sortedMonths.forEach(m => {
-    // 가독성을 위해 "2026-05"를 "2026년 05월"로 변환하여 노출
     const [year, month] = m.split('-');
     optionsHtml += `<option value="${m}">${year}년 ${month}월</option>`;
   });
 
   monthSelect.innerHTML = optionsHtml;
 
-  // 이전에 선택했던 값이 새 옵션에도 존재하면 복원, 없으면 'all'
-  if (sortedMonths.includes(currentValue)) {
+  // 기존 선택값 유지 보완 로직
+  if (currentValue === 'all' || sortedMonths.includes(currentValue)) {
     monthSelect.value = currentValue;
   } else {
-    if (sortedMonths.length > 0) {
-    monthSelect.value = sortedMonths[0];
-    }
+    monthSelect.value = 'all';
   }
 }
 // ---------- Detail Modal ----------
