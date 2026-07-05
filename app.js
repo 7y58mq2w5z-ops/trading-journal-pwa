@@ -182,42 +182,43 @@ function fillForm(t) {
   if (span2) span2.textContent = t.image2_url ? '이미지 저장됨' : '파일 선택';
 }
 
-/*// ---------- Month dropdown (중복 및 서버 조회 제거 최적화) ----------
-function populateMonthSelect(tradesArray) {
-  const monthSel = $('#monthSelect');
-  if (!monthSel) return;
+// ---------- Month dropdown ----------
+async function populateMonthSelect() {
+  const toolbar = $('#searchInput')?.parentElement || null;
+  if (!toolbar) return;
 
-  // 기존에 사용자가 선택하고 있던 달(월)을 기억
+  let monthSel = $('#monthSelect');
+  if (!monthSel) {
+    monthSel = document.createElement('select');
+    monthSel.id = 'monthSelect';
+    monthSel.className = 'input';
+    monthSel.style.width = '7.5rem';
+    toolbar.appendChild(monthSel);
+    monthSel.addEventListener('change', renderList);
+  }
+
+  const data = await idbAll();
+  const months = Array.from(new Set(data.map(t=>monthKeyOf(t.date)).filter(Boolean))).sort().reverse();
   const cur = monthSel.value || 'all';
 
-  // [속도 개선] 서버에서 새로 select 하지 않고, 이미 불러온 데이터(tradesArray)를 재활용합니다.
-  const targetData = tradesArray && tradesArray.length ? tradesArray : (globalTrades || []);
-  
-  const months = Array.from(
-    new Set(targetData.map(t => t.date ? t.date.substring(0, 7) : null).filter(Boolean))
-  ).sort().reverse();
-
-  // 첫 번째 기본 옵션을 '전체 기간'으로 빌드 (HTML 디자인 공간 낭비 방지)
-  monthSel.innerHTML = '<option value="all">전체 기간</option>';
-  
-  months.forEach(key => {
+  monthSel.innerHTML = '';
+  const optAll = document.createElement('option');
+  optAll.value = 'all'; optAll.textContent = '전체';
+  monthSel.appendChild(optAll);
+  months.forEach(key=>{
     const opt = document.createElement('option');
-    opt.value = key; 
-    
-    // "2026-05" -> "2026년 05월" 포맷 변환
-    const [year, month] = key.split('-');
-    opt.textContent = `${year}년 ${month}월`;
-    
+    opt.value = key;
+    opt.textContent = monthLabel(key);
     monthSel.appendChild(opt);
   });
 
-  // 이전에 선택했던 값이 새 목록에도 존재하면 선택 상태를 유지시킵니다.
-  if ([...monthSel.options].some(o => o.value === cur)) {
-    monthSel.value = cur;
-  } else {
-    monthSel.value = 'all';
-  }
-}*/
+  if ([...monthSel.options].some(o=>o.value===cur)) monthSel.value = cur;
+
+  const search = $('#searchInput');
+  const sort = $('#sortSelect');
+  if (search) search.style.flex = '1 1 auto';
+  if (sort) sort.style.width = '7.5rem';
+}
 
 // ---------- View counter helper ----------
 async function incrementViews(id, currentViews) {
@@ -226,72 +227,33 @@ async function incrementViews(id, currentViews) {
   return newViews;
 }
 // ---------- List render ----------
-let chart = null;
+let chart;
 async function renderList() {
+  // [추가] 리스트를 갱신하기 전의 현재 스크롤 위치를 기억합니다.
   const scrollPos = window.scrollY;
+
   const q = $('#searchInput')?.value?.trim().toLowerCase() || '';
   const sortKey = $('#sortSelect')?.value || 'date_desc';
-  
-  // [수정]: ID를 고유하게 'monthSelect'로 통일하여 매핑 오류 방지
-  const monthKey = $('#monthSelect')?.value || 'all';
+  const monthKey = $('#monthSelect') ? $('#monthSelect').value : 'all';
 
-  // [성능 개선 1] Supabase 기본 쿼리 생성
-  let query = supabase.from('trading_logs').select('*');
+  const data = await idbAll();
 
-  // [월단위 검색 오류 수정] 안전한 범위 지정 lt(<) 연산 사용
-  if (monthKey !== 'all') {
-    const [year, month] = monthKey.split('-').map(Number);
-    const startDate = `${monthKey}-01`;
-    
-    let nextYear = year;
-    let nextMonth = month + 1;
-    if (nextMonth > 12) {
-      nextMonth = 1;
-      nextYear += 1;
-    }
-    const nextMonthStr = String(nextMonth).padStart(2, '0');
-    const endDateBoundary = `${nextYear}-${nextMonthStr}-01`;
+  let rows = data.filter(t => {
+    const tagStr = (t.tags || '').toLowerCase();
+    const sym = (t.symbol || '').toLowerCase();
+    const okQuery = !q || tagStr.includes(q) || sym.includes(q);
+    const okMonth = monthKey === 'all' || monthKeyOf(t.date) === monthKey;
+    return okQuery && okMonth;
+  });
 
-    query = query.gte('date', startDate).lt('date', endDateBoundary);
-  }
-
-  // 데이터 가져오기
-  const { data, error } = await query;
-  if (error || !data) return;
-
-  // [태그 및 종목명 검색 통합 처리] 자바스크립트 단에서 정밀하게 필터링
-  let rows = [...data];
-  if (q) {
-    rows = rows.filter(t => {
-      const symbolMatch = t.symbol ? t.symbol.toLowerCase().includes(q) : false;
-      
-      let tagMatch = false;
-      if (Array.isArray(t.tags)) {
-        tagMatch = t.tags.some(tag => tag.toLowerCase().includes(q));
-      } else if (typeof t.tags === 'string') {
-        tagMatch = t.tags.toLowerCase().includes(q);
-      }
-
-      return symbolMatch || tagMatch;
-    });
-  }
-
-  // 정렬 처리
-  rows.sort((a, b) => {
-    if (sortKey === 'date_desc') {
-      const dateCmp = (b.date || '').localeCompare(a.date || '');
-      return dateCmp !== 0 ? dateCmp : (b.id - a.id);
-    }
-    if (sortKey === 'date_asc') {
-      const dateCmp = (a.date || '').localeCompare(b.date || '');
-      return dateCmp !== 0 ? dateCmp : (a.id - b.id);
-    }
+  rows.sort((a,b)=>{
+    if (sortKey === 'date_desc') return (b.date||'').localeCompare(a.date||'');
+    if (sortKey === 'date_asc') return (a.date||'').localeCompare(b.date||'');
     if (sortKey === 'pnl_desc') return formatPnL(b) - formatPnL(a);
     if (sortKey === 'pnl_asc') return formatPnL(a) - formatPnL(b);
     return 0;
   });
 
-  // 테이블 생성 로직
   const table = [`<table class="min-w-full table-fixed text-xs">
     <thead class="text-slate-500">
       <tr>
@@ -304,104 +266,68 @@ async function renderList() {
     </thead>
     <tbody>`];
 
-  let lastDate = null, alt = false;
+  let lastDate = null;
+  let alt = false;
+
   for (const t of rows) {
-    const pnl = formatPnL(t), r = rate(t), d = t.date || '';
+    const pnl = formatPnL(t);
+    const r = rate(t);
+    const d = t.date || '';
     if (d !== lastDate) { alt = !alt; lastDate = d; }
-    
-    const symbolHtml = t.highlight
+    const rowBg = alt ? 'bg-slate-100' : 'bg-white';
+    const dateCell = d ? `${fmtDateNoYear(d)}` : '';
+
+    const symbolHtml = (t.highlight)
       ? `<span class="inline-flex items-center gap-1 font-semibold max-w-full overflow-hidden">
            <span class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
-           <span class="block overflow-hidden text-ellipsis whitespace-nowrap">${t.symbol}</span>
+           <span class="block overflow-hidden text-ellipsis whitespace-nowrap">${t.symbol||''}</span>
          </span>`
-      : `<span class="block overflow-hidden text-ellipsis whitespace-nowrap">${t.symbol}</span>`;
+      : `<span class="block overflow-hidden text-ellipsis whitespace-nowrap">${t.symbol||''}</span>`;
 
-    table.push(`<tr class="border-t border-slate-200 cursor-pointer ${alt ? 'bg-slate-100' : 'bg-white'}" data-id="${t.id}">
-      <td class="py-1 pr-2 whitespace-nowrap">${fmtDateNoYear(d)}</td>
+    const views = Number(t.views || 0);
+
+    table.push(`<tr class="border-t border-slate-200 cursor-pointer ${rowBg}" data-id="${t.id}">
+      <td class="py-1 pr-2 whitespace-nowrap">${dateCell}</td>
       <td class="py-1 pr-2 w-28 max-w-28 overflow-hidden text-ellipsis whitespace-nowrap">${symbolHtml}</td>
-      <td class="py-1 pr-2 text-right whitespace-nowrap">${r >= 0 ? `<span class="pnl-pos">${r.toFixed(2)}%</span>` : `<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
-      <td class="py-1 pr-2 text-right whitespace-nowrap">${pnl >= 0 ? `<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>` : `<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
-      <td class="py-1 pr-2 w-12 text-right text-slate-600 whitespace-nowrap class-views">${fmtNumber(t.views || 0)}</td>
+      <td class="py-1 pr-2 text-right whitespace-nowrap">${r>=0?`<span class="pnl-pos">${r.toFixed(2)}%</span>`:`<span class="pnl-neg">${r.toFixed(2)}%</span>`}</td>
+      <td class="py-1 pr-2 text-right whitespace-nowrap">${pnl>=0?`<span class="pnl-pos">${fmtNumber(Math.round(pnl))}</span>`:`<span class="pnl-neg">${fmtNumber(Math.round(pnl))}</span>`}</td>
+      <td class="py-1 pr-2 w-12 text-right text-slate-600 whitespace-nowrap">${fmtNumber(views)}</td>
     </tr>`);
   }
+
   table.push(`</tbody></table>`);
   $('#listContainer').innerHTML = table.join('');
 
-  requestAnimationFrame(() => { window.scrollTo(0, scrollPos); });
+  // [중요] 리스트를 화면에 그린 직후, 기억해둔 스크롤 위치로 즉시 이동합니다.
+  requestAnimationFrame(() => {
+    window.scrollTo(0, scrollPos);
+  });
 
-  // 클릭 이벤트 최적화
-  $('#listContainer').querySelectorAll('tr[data-id]').forEach(tr => {
-    tr.addEventListener('click', async () => {
+  $('#listContainer').querySelectorAll('tr[data-id]').forEach(tr=>{
+    tr.addEventListener('click', async ()=>{
       const id = Number(tr.getAttribute('data-id'));
-      const targetData = rows.find(x => x.id === id);
-      if (!targetData) return;
-      
-      const viewTd = tr.querySelector('.class-views');
-      if (viewTd) viewTd.textContent = fmtNumber((targetData.views || 0) + 1);
-
-      const updatedViews = await incrementViews(id, targetData.views);
-      targetData.views = updatedViews;
-      
-      openDetail(targetData);
+      await openDetailWithViewCount(id);
     });
   });
 
-  // 차트 렌더링용 집계 데이터 최적화
-  if (typeof Chart !== 'undefined') {
-    const byDate = {};
-    for (const t of rows) {
-      if (t.date) byDate[t.date] = (byDate[t.date] || 0) + formatPnL(t);
-    }
-    const days = Object.keys(byDate).sort();
-    if (chart) chart.destroy();
-    const ctx = document.getElementById('pnlChart');
-    if (ctx) {
-      chart = new Chart(ctx, {
-        type: 'bar',
-        data: { 
-          labels: days.map(fmtDateNoYear), 
-          datasets: [{ label: '일별 손익 합계', data: days.map(d => byDate[d]), backgroundColor: days.map(d => byDate[d] >= 0 ? '#ef4444' : '#3b82f6') }] 
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-      });
-    }
+  // 차트 로직... (동일)
+  const byDate = {};
+  for (const t of data) if (t.date) byDate[t.date] = (byDate[t.date] || 0) + formatPnL(t);
+  const days = Object.keys(byDate).sort();
+  const labels = days.map(fmtDateNoYear);
+  const values = days.map(d => byDate[d]);
+
+  if (chart) chart.destroy();
+  const ctx = document.getElementById('pnlChart');
+  if (ctx) {
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: '일별 손익 합계', data: values }] },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
   }
 }
 
-// [수정 완료] 드롭다운 목록 내부에 '전체 기간' 선택지를 포함하도록 개선한 함수
-function updateMonthFilterOptions() {
-  const monthSelect = document.getElementById('monthSelect');
-  if (!monthSelect) return;
-
-  const currentValue = monthSelect.value || 'all';
-
-  // 데이터에서 중복 없는 YYYY-MM 추출
-  const monthsSet = new Set();
-  globalTrades.forEach(trade => {
-    if (trade.date && trade.date.length >= 7) {
-      monthsSet.add(trade.date.substring(0, 7));
-    }
-  });
-
-  // 최신 달이 위로 오도록 내림차순 정렬
-  const sortedMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
-
-  // [수정]: 아무 동작 안 하던 외부 텍스트 영역을 없애는 대신, 셀렉트 박스 내부 첫 옵션으로 '전체 기간'을 추가합니다.
-  let optionsHtml = '<option value="all">전체 기간</option>';
-  sortedMonths.forEach(m => {
-    const [year, month] = m.split('-');
-    optionsHtml += `<option value="${m}">${year}년 ${month}월</option>`;
-  });
-
-  monthSelect.innerHTML = optionsHtml;
-
-  // 기존 선택값 유지 보완 로직
-  if (currentValue === 'all' || sortedMonths.includes(currentValue)) {
-    monthSelect.value = currentValue;
-  } else {
-    monthSelect.value = 'all';
-  }
-}
 // ---------- Detail Modal ----------
 async function openDetail(t){
   lastOpenedDetail = t;
