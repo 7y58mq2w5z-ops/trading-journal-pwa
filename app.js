@@ -224,7 +224,7 @@ async function renderList() {
   const scrollPos = window.scrollY;
   const q = $('#searchInput')?.value?.trim().toLowerCase() || '';
   const sortKey = $('#sortSelect')?.value || 'date_desc';
-  const monthKey = $('#monthSelect')?.value || 'all'; // 형태: "2026-05" 또는 "all"
+  const monthKey = $('#monthFilterSelect')?.value || 'all';
 
   // [성능 개선 1] Supabase 기본 쿼리 생성
   let query = supabase.from('trading_logs').select('*');
@@ -388,7 +388,7 @@ function updateMonthFilterOptions() {
   const sortedMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
 
   // HTML 옵션 초기화 (전체 기간은 고정)
-  let optionsHtml = '<option value="all">전체 기간</option>';
+  let optionsHtml = '';
   sortedMonths.forEach(m => {
     // 가독성을 위해 "2026-05"를 "2026년 05월"로 변환하여 노출
     const [year, month] = m.split('-');
@@ -401,7 +401,9 @@ function updateMonthFilterOptions() {
   if (sortedMonths.includes(currentValue)) {
     monthSelect.value = currentValue;
   } else {
-    monthSelect.value = 'all';
+    if (sortedMonths.length > 0) {
+    monthSelect.value = sortedMonths[0];
+    }
   }
 }
 // ---------- Detail Modal ----------
