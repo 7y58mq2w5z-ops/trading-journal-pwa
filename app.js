@@ -387,13 +387,13 @@ function updateMonthFilterOptions() {
   // 정렬 (최신 달이 위로 오게 하려면 오름차순/내림차순 정렬)
   const sortedMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
 
-  // HTML 옵션 초기화 (전체 기간은 고정)
+  /*// HTML 옵션 초기화 (전체 기간은 고정)
   let optionsHtml = '<option value="all">전체 기간</option>';
   sortedMonths.forEach(m => {
     // 가독성을 위해 "2026-05"를 "2026년 05월"로 변환하여 노출
     const [year, month] = m.split('-');
     optionsHtml += `<option value="${m}">${year}년 ${month}월</option>`;
-  });
+  });*/
 
   monthSelect.innerHTML = optionsHtml;
 
