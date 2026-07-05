@@ -788,7 +788,8 @@ function switchTab(name) {
   switchTab('list');
   
   if (SUPABASE_URL && SUPABASE_KEY) {
-
+    await populateMonthSelect();
+    await renderList();
     window.scrollTo({
       top: 0,
       left: 0,
@@ -991,7 +992,7 @@ function switchTab(name) {
   });
 
   // 안전한 구동을 위해 캘린더와 노트 이벤트를 초기화 마지막 단계로 조정
-  // await initCalendar();
+  await initCalendar();
   setupNoteModalEvents();
 
 })();
@@ -1005,15 +1006,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const errorMsg = document.getElementById('lockError');
 
   // 잠금 해제 인증 함수
-  async function checkPassword()
+  function checkPassword()
     if (passwordInput.value === APP_PASSWORD) {
       // 비밀번호가 맞으면 모달을 부드럽게 숨김 처리
       lockModal.style.setProperty('display', 'none', 'important');
-      await populateMonthSelect();
-      await renderList();
-      await initCalendar();
-      await refreshCalendar();
-
       passwordInput.value = ''; // 입력창 초기화
       errorMsg.classList.add('hidden');
     } else {
