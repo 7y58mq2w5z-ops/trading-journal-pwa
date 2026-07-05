@@ -788,8 +788,10 @@ function switchTab(name) {
   switchTab('list');
   
   if (SUPABASE_URL && SUPABASE_KEY) {
+    
     await populateMonthSelect();
     await renderList();
+    
     window.scrollTo({
       top: 0,
       left: 0,
