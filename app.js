@@ -368,6 +368,42 @@ async function renderList() {
     }
   }
 }
+// 현재 축적된 전체 데이터(globalTrades)를 기준으로 월선택 필터 옵션을 자동 생성하는 함수
+function updateMonthFilterOptions() {
+  const monthSelect = document.getElementById('monthFilterSelect');
+  if (!monthSelect) return;
+
+  // 현재 선택되어 있던 값을 임시 보관
+  const currentValue = monthSelect.value;
+
+  // 데이터에서 중복 없는 YYYY-MM 추출
+  const monthsSet = new Set();
+  globalTrades.forEach(trade => {
+    if (trade.date && trade.date.length >= 7) {
+      monthsSet.add(trade.date.substring(0, 7)); // "2026-05" 형태로 추출됨
+    }
+  });
+
+  // 정렬 (최신 달이 위로 오게 하려면 오름차순/내림차순 정렬)
+  const sortedMonths = Array.from(monthsSet).sort((a, b) => b.localeCompare(a));
+
+  // HTML 옵션 초기화 (전체 기간은 고정)
+  let optionsHtml = '<option value="all">전체 기간</option>';
+  sortedMonths.forEach(m => {
+    // 가독성을 위해 "2026-05"를 "2026년 05월"로 변환하여 노출
+    const [year, month] = m.split('-');
+    optionsHtml += `<option value="${m}">${year}년 ${month}월</option>`;
+  });
+
+  monthSelect.innerHTML = optionsHtml;
+
+  // 이전에 선택했던 값이 새 옵션에도 존재하면 복원, 없으면 'all'
+  if (sortedMonths.includes(currentValue)) {
+    monthSelect.value = currentValue;
+  } else {
+    monthSelect.value = 'all';
+  }
+}
 // ---------- Detail Modal ----------
 async function openDetail(t){
   lastOpenedDetail = t;
