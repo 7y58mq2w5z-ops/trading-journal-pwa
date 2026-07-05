@@ -818,11 +818,31 @@ document.addEventListener('DOMContentLoaded', () => {
   const unlockBtn = document.getElementById('lockUnlockBtn');
   const errorMsg = document.getElementById('lockError');
 
+  /*function checkPassword() {
+    if (passwordInput.value === APP_PASSWORD) {
+      lockModal.style.setProperty('display', 'none', 'important');
+      passwordInput.value = '';
+      errorMsg.classList.add('hidden');
+    } else {
+      errorMsg.classList.remove('hidden');
+      passwordInput.value = '';
+      passwordInput.focus();
+      if (navigator.vibrate) navigator.vibrate(200); 
+    }
+  }*/
+// app.js 내부의 기존 checkPassword() 부분을 찾아 아래와 같이 교체해 주세요.
   function checkPassword() {
     if (passwordInput.value === APP_PASSWORD) {
       lockModal.style.setProperty('display', 'none', 'important');
       passwordInput.value = '';
       errorMsg.classList.add('hidden');
+
+      // [추가] 비밀번호가 맞았을 때 숨겨져 있던 본문 레이아웃을 표시합니다.
+      const appMain = document.getElementById('app');
+      if (appMain) {
+        appMain.classList.remove('hidden');
+      }
+      
     } else {
       errorMsg.classList.remove('hidden');
       passwordInput.value = '';
