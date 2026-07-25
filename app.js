@@ -223,7 +223,13 @@ async function renderList() {
   const scrollPos = window.scrollY;
   const q = $('#searchInput')?.value?.trim().toLowerCase() || '';
   const sortKey = $('#sortSelect')?.value || 'date_desc';
-  const monthKey = $('#monthSelect')?.value || 'all'; // 형태: "2026-05" 또는 "all"
+  // const monthKey = $('#monthSelect')?.value || 'all'; // 형태: "2026-05" 또는 "all"
+  // 💡 오늘 날짜 기준으로 현재 월(YYYY-MM) 구하기
+  const today = new Date();
+  const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  
+  // #monthSelect 값이 없으면 'all' 대신 '현재 월'을 기본값으로 사용
+  const monthKey = $('#monthSelect')?.value || currentMonthKey;
 
   // [성능 개선 1] Supabase 기본 쿼리 생성
   let query = supabase.from('trading_logs').select('*');
