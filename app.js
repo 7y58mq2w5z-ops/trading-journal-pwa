@@ -199,16 +199,33 @@ async function populateMonthSelect() {
 
   const { data } = await supabase.from('trading_logs').select('date');
   if (!data) return;
-  const months = Array.from(new Set(data.map(t=>monthKeyOf(t.date)).filter(Boolean))).sort().reverse();
-  const cur = monthSel.value || 'all';
+
+  const months = Array.from(
+    new Set(data.map(t => monthKeyOf(t.date)).filter(Boolean))
+  ).sort().reverse();
+
+  // 현재 월 (예: 2026-07)
+  const today = new Date();
+  const currentMonth =
+    `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+  // 이미 값이 있으면 유지, 처음 실행이면 현재 월 선택
+  const cur = monthSel.value || currentMonth;
 
   monthSel.innerHTML = '<option value="all">전체</option>';
-  months.forEach(key=>{
+
+  months.forEach(key => {
     const opt = document.createElement('option');
-    opt.value = key; opt.textContent = monthLabel(key);
+    opt.value = key;
+    opt.textContent = monthLabel(key);
     monthSel.appendChild(opt);
   });
-  if ([...monthSel.options].some(o=>o.value===cur)) monthSel.value = cur;
+
+  if ([...monthSel.options].some(o => o.value === cur)) {
+    monthSel.value = cur;
+  } else {
+    monthSel.value = 'all';
+  }
 }
 
 // ---------- View counter helper ----------
