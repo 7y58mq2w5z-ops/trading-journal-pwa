@@ -770,10 +770,12 @@ function switchTab(name) {
 
 // ---------- Init ----------
 (async function init() {
+  console.log("🚀 [앱 시작] init() 함수가 정상 실행되었습니다!"); // 💡 이 줄을 추가해주세요!
   $$('.tab-btn').forEach(btn=>btn.addEventListener('click', ()=>switchTab(btn.dataset.tab)));
   switchTab('list');
   
   if (SUPABASE_URL && SUPABASE_KEY) {
+    console.log("📡 Supabase 데이터 조회를 시작합니다..."); // 💡 이 줄도 추가해보세요!
     await populateMonthSelect();
     await renderList();
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
