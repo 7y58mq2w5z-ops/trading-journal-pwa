@@ -200,7 +200,13 @@ async function populateMonthSelect() {
   const { data } = await supabase.from('trading_logs').select('date');
   if (!data) return;
   const months = Array.from(new Set(data.map(t=>monthKeyOf(t.date)).filter(Boolean))).sort().reverse();
-  const cur = monthSel.value || 'all';
+
+  // 💡 [수정 1] 오늘 날짜 기준 'YYYY-MM' 생성
+  const today = new Date();
+  const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+  // 💡 [수정 2] 기존 선택값이 없으면 'all' 대신 '현재 월'을 기본으로 설정
+  const cur = monthSel.value || currentMonthKey;
 
   monthSel.innerHTML = '<option value="all">전체</option>';
   months.forEach(key=>{
@@ -208,7 +214,9 @@ async function populateMonthSelect() {
     opt.value = key; opt.textContent = monthLabel(key);
     monthSel.appendChild(opt);
   });
-  if ([...monthSel.options].some(o=>o.value===cur)) monthSel.value = cur;
+
+  // 선택값 반영 (목록에 현재 월이 있으면 선택, 없으면 설정)
+  monthSel.value = cur;
 }
 
 // ---------- View counter helper ----------
@@ -217,17 +225,21 @@ async function incrementViews(id, currentViews) {
   await supabase.from('trading_logs').update({ views: newViews }).eq('id', id);
   return newViews;
 }
-
 // ---------- List render ----------
 let chart = null;
 async function renderList() {
   const scrollPos = window.scrollY;
   const q = $('#searchInput')?.value?.trim().toLowerCase() || '';
   const sortKey = $('#sortSelect')?.value || 'date_desc';
-  const monthKey = $('#monthSelect')?.value || 'all'; // 형태: "2026-05" 또는 "all"
+
+  // 💡 [수정 3] 기본 조회 월을 'all'이 아닌 '현재 월'로 변경
+  const today = new Date();
+  const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const monthKey = $('#monthSelect')?.value || currentMonthKey; // 기본값을 현재 월로 지정!
 
   // [성능 개선 1] Supabase 기본 쿼리 생성
   let query = supabase.from('trading_logs').select('*');
+  
 
   // [월단위 검색 오류 수정] 하드코딩된 -31을 제거하고 해당 월의 안전한 범위 지정
   if (monthKey !== 'all') {
