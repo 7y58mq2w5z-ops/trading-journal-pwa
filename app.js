@@ -201,11 +201,11 @@ async function populateMonthSelect() {
   if (!data) return;
   const months = Array.from(new Set(data.map(t=>monthKeyOf(t.date)).filter(Boolean))).sort().reverse();
 
-  // 💡 [수정 1] 오늘 날짜 기준 'YYYY-MM' 생성
+  // 🔥 [핵심 수정] 이번 달 연-월(YYYY-MM) 구하기
   const today = new Date();
   const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-  // 💡 [수정 2] 기존 선택값이 없으면 'all' 대신 '현재 월'을 기본으로 설정
+  // 기존 선택값이 있으면 유지하고, 없으면 'all' 대신 '이번 달'을 기본값으로 설정
   const cur = monthSel.value || currentMonthKey;
 
   monthSel.innerHTML = '<option value="all">전체</option>';
@@ -215,7 +215,7 @@ async function populateMonthSelect() {
     monthSel.appendChild(opt);
   });
 
-  // 선택값 반영 (목록에 현재 월이 있으면 선택, 없으면 설정)
+  // 이번 달 옵션이 존재하면 선택, 존재하지 않더라도 값 세팅
   monthSel.value = cur;
 }
 
