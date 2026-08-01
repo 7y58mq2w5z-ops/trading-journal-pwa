@@ -201,13 +201,17 @@ async function populateMonthSelect() {
   if (!data) return;
   const months = Array.from(new Set(data.map(t=>monthKeyOf(t.date)).filter(Boolean))).sort().reverse();
 
-  // 🔥 [핵심 수정] 이번 달 연-월(YYYY-MM) 구하기
+  // 💡 오늘 날짜 기준 이번 달 구하기 (예: "2026-08")
   const today = new Date();
   const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-  // 기존 선택값이 있으면 유지하고, 없으면 'all' 대신 '이번 달'을 기본값으로 설정
-  const cur = monthSel.value || currentMonthKey;
+  // 💡 [핵심] 기존 선택값이 'all'이거나 없으면 무조건 '이번 달(2026-08)'로 설정!
+  let cur = monthSel.value;
+  if (!cur || cur === 'all') {
+    cur = currentMonthKey;
+  }
 
+  // 옵션 목록 채우기
   monthSel.innerHTML = '<option value="all">전체</option>';
   months.forEach(key=>{
     const opt = document.createElement('option');
@@ -215,7 +219,7 @@ async function populateMonthSelect() {
     monthSel.appendChild(opt);
   });
 
-  // 이번 달 옵션이 존재하면 선택, 존재하지 않더라도 값 세팅
+  // 드롭다운에 이번 달 선택값 강제 적용
   monthSel.value = cur;
 }
 
