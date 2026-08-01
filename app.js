@@ -217,6 +217,7 @@ async function incrementViews(id, currentViews) {
   await supabase.from('trading_logs').update({ views: newViews }).eq('id', id);
   return newViews;
 }
+
 // ---------- List render ----------
 let chart = null;
 async function renderList() {
