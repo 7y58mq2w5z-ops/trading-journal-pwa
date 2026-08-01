@@ -237,6 +237,9 @@ async function renderList() {
   const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   const monthKey = $('#monthSelect')?.value || currentMonthKey; // 기본값을 현재 월로 지정!
 
+  // 🚨 [추가] 브라우저 콘솔에서 어떤 값이 들어오는지 확인하는 로그
+  console.log("🔍 [renderList 실행] 조회 기준 monthKey:", monthKey, " / DOM값:", $('#monthSelect')?.value);
+
   // [성능 개선 1] Supabase 기본 쿼리 생성
   let query = supabase.from('trading_logs').select('*');
   
