@@ -151,19 +151,10 @@
         <label class="label">날짜 <input type="date" name="date" required class="input" style="width: 92% !important; box-sizing: border-box !important; height: 1.7rem !important;"></label>
         <label class="label">종목명 <input type="text" name="symbol" required class="input w-full" placeholder="종목명"></label>
 
-        <div class="flex items-center gap-4">
-          <!-- 기존: 주황색 강조 -->
-          <label class="inline-flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" name="highlight_orange" class="accent-orange-500">
-            <span class="text-sm text-slate-600">종목 강조(주황)</span>
-          </label>
-        
-          <!-- 추가: 빨간색 강조 -->
-          <label class="inline-flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" name="highlight_red" class="accent-red-500">
-            <span class="text-sm text-slate-600">종목 강조(빨강)</span>
-          </label>
-        </div>
+        <label class="inline-flex items-center gap-2">
+          <input type="checkbox" name="highlight">
+          <span class="text-sm text-slate-600">종목 강조 표시</span>
+        </label>
 
         <div class="grid grid-cols-3 gap-2">
           <label class="label">수량 <input type="number" name="qty" step="1" class="input w-full"></label>
