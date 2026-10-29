@@ -557,7 +557,18 @@ async function initCalendar() {
   if (!calEl || typeof FullCalendar === 'undefined') return;
   
   calendar = new FullCalendar.Calendar(calEl, {
-    initialView: 'dayGridMonth', height: 'auto', locale: 'ko',
+    //initialView: 'dayGridMonth', height: 'auto', locale: 'ko',
+    initialView: 'dayGridMonth',
+    height: 'auto',
+    locale: 'ko',
+    headerToolbar: {
+      left: 'title',
+      center: '',
+      right: 'today prev,next'
+    },
+    buttonText: {
+      today: '오늘'
+    },
     dayCellDidMount: (arg) => {
       const d = arg.date.getDay();
       if (d === 0) arg.el.style.color = '#dc2626';
