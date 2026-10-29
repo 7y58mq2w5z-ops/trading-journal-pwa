@@ -200,6 +200,7 @@ async function populateMonthSelect() {
   monthSel.style.minWidth = '115px';
   monthSel.style.maxWidth = '115px';
   monthSel.style.fontSize = '14px';
+  monthsel.style.flexShrink = '0';
   monthSel.style.boxSizing = 'border-box';
 
   const { data } = await supabase.from('trading_logs').select('date');
