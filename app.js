@@ -215,7 +215,7 @@ async function populateMonthSelect() {
   monthSel.innerHTML = '<option value="all">전체</option>';
   months.forEach(key=>{
     const opt = document.createElement('option');
-    opt.value = key; opt.textContent = monthLabel(key);
+    opt.value = key; opt.textContent = key;
     monthSel.appendChild(opt);
   });
 
