@@ -507,6 +507,7 @@ async function openDetail(t){
 
   editBtn.addEventListener('click', ()=>{
     modal.classList.remove('show');
+    document.body.style.overflow = '';
     document.querySelector('[data-tab="form"]')?.click();
     fillForm(t);
     setFormMode('edit');
