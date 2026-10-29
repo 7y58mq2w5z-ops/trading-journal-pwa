@@ -192,7 +192,8 @@ async function populateMonthSelect() {
     monthSel = document.createElement('select');
     monthSel.id = 'monthSelect';
     monthSel.className = 'input';
-    monthSel.style.width = '7.5rem';
+    monthSel.style.width = '8rem';
+    monthSel.style.minWidth = '8rem';
     toolbar.appendChild(monthSel);
     monthSel.addEventListener('change', renderList);
   }
