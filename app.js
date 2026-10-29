@@ -59,21 +59,7 @@ function monthLabel(key){ if (!key) return '전체'; const [y,m] = key.split('-'
 // ---------- Zoom CSS & Fullscreen Helpers ----------
 function ensureZoomStyles(){
   if (document.getElementById('zoom-style')) return;
-  //const css = `.img-zoomed{position:fixed!important;inset:0!important;margin:0!important;background:rgba(0,0,0,.85)!important;object-fit:contain!important;max-width:100vw!important;max-height:100vh!important;width:100vw!important;height:100vh!important;z-index:9999!important;cursor:zoom-out!important}`;
-  //const css = `.img-zoomed{position:fixed!important;inset:0!important;margin:0!important;background:rgba(0,0,0,.85)!important;object-fit:contain!important;max-width:100vw!important;max-height:100vh!important;z-index:9999!important;cursor:zoom-out!important}`;
-  const css = `.img-zoomed{
-    position:fixed!important;
-    inset:0!important;
-    margin:auto!important;
-    width:auto!important;
-    height:auto!important;
-    max-width:95vw!important;
-    max-height:90vh!important;
-    object-fit:contain!important;
-    background:rgba(0,0,0,.85)!important;
-    z-index:9999!important;
-    cursor:zoom-out!important;
-  }`;  
+  const css = `.img-zoomed{position:fixed!important;inset:0!important;margin:0!important;background:rgba(0,0,0,.85)!important;object-fit:contain!important;max-width:100vw!important;max-height:100vh!important;width:100vw!important;height:100vh!important;z-index:9999!important;cursor:zoom-out!important}`;
   const s = document.createElement('style'); s.id = 'zoom-style'; s.textContent = css; document.head.appendChild(s);
 }
 async function tryFullscreen(el){
@@ -499,11 +485,16 @@ async function openDetail(t){
   
     el.onclick = (ev) => {
       ev.stopPropagation();
-      toggleZoomFallback(el);
+      openFullscreenImage(el.src);
     };
   }
   
-  attachZoomHandler('img1'); attachZoomHandler('img2'); attachZoomHandler('dayImg1'); attachZoomHandler('dayImg2');
+  attachZoomHandler('img1');
+  attachZoomHandler('img2');
+  attachZoomHandler('dayImg1');
+  attachZoomHandler('dayImg2');
+  
+  // attachZoomHandler('img1'); attachZoomHandler('img2'); attachZoomHandler('dayImg1'); attachZoomHandler('dayImg2');
 
   let editBtn = document.getElementById('detailEdit');
   if (editBtn) editBtn.remove();
@@ -693,7 +684,7 @@ function setupNoteModalEvents() {
     closeFullscreenImage();
   });
 }
-
+/*
 function openFullscreenImage(src) {
   const wrap = document.getElementById('imgFullscreen');
   const img = document.getElementById('imgFullscreenImg');
@@ -701,6 +692,25 @@ function openFullscreenImage(src) {
   img.src = src;
   wrap.classList.remove('hidden');
   wrap.style.display = 'flex';
+}*/
+function openFullscreenImage(src) {
+  const wrap = document.getElementById('imgFullscreen');
+  const img = document.getElementById('imgFullscreenImg');
+
+  if (!wrap || !img || !src) return;
+
+  img.src = src;
+
+  wrap.classList.remove('hidden');
+  wrap.style.display = 'flex';
+  wrap.style.alignItems = 'center';
+  wrap.style.justifyContent = 'center';
+
+  img.style.maxWidth = '95vw';
+  img.style.maxHeight = '95vh';
+  img.style.width = 'auto';
+  img.style.height = 'auto';
+  img.style.objectFit = 'contain';
 }
 
 function closeFullscreenImage() {
