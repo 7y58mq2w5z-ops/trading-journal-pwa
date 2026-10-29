@@ -196,9 +196,9 @@ async function populateMonthSelect() {
     monthSel.addEventListener('change', renderList);
   }
   
-  monthSel.style.width = '100px';
-  monthSel.style.minWidth = '100px';
-  monthSel.style.maxWidth = '100px';
+  monthSel.style.width = '115px';
+  monthSel.style.minWidth = '115px';
+  monthSel.style.maxWidth = '115px';
   monthSel.style.fontSize = '14px';
   monthSel.style.boxSizing = 'border-box';
 
