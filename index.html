@@ -110,6 +110,31 @@
     #tab-list {
       padding-bottom: 80vh !important; 
     } 
+    /* 모바일 캘린더 상단 정렬 */
+    @media (max-width: 600px) {
+      #calendar .fc-header-toolbar {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 10px !important;
+      }
+    
+      #calendar .fc-toolbar-chunk {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        width: 100% !important;
+      }
+    
+      #calendar .fc-toolbar-title {
+        white-space: nowrap !important;
+        font-size: 1.5rem !important;
+      }
+    
+      #calendar .fc-header-toolbar .fc-toolbar-chunk:last-child {
+        justify-content: flex-end !important;
+      }
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen select-none"> <div id="lockModal" class="fixed inset-0 flex items-center justify-center overflow-hidden overscroll-none touch-none">
