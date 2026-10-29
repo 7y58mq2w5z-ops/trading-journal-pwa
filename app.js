@@ -471,7 +471,7 @@ async function openDetail(t){
 
   const closeBtn = document.getElementById('detailClose');
   if (closeBtn) { closeBtn.onclick = () => { modal.classList.remove('show'); }; }
-  
+  /*
   function attachZoomHandler(id){
     const el = document.getElementById(id);
     if (!el) return;
@@ -479,7 +479,17 @@ async function openDetail(t){
       ev.stopPropagation();
       if (!(await tryFullscreen(el))) toggleZoomFallback(el);
     };
+  }*/
+  function attachZoomHandler(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+  
+    el.onclick = (ev) => {
+      ev.stopPropagation();
+      toggleZoomFallback(el);
+    };
   }
+  
   attachZoomHandler('img1'); attachZoomHandler('img2'); attachZoomHandler('dayImg1'); attachZoomHandler('dayImg2');
 
   let editBtn = document.getElementById('detailEdit');
