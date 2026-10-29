@@ -467,9 +467,11 @@ async function openDetail(t){
   if ($('#detailComment')) $('#detailComment').textContent = t.comment || '';
   const modal = $('#detailModal');
   modal.classList.add('show');
+  document.body.style.overflow = 'hidden';
 
   const closeBtn = document.getElementById('detailClose');
-  if (closeBtn) { closeBtn.onclick = () => { modal.classList.remove('show'); }; }
+  //if (closeBtn) { closeBtn.onclick = () => { modal.classList.remove('show'); }; }
+  if (closeBtn) { closeBtn.onclick = () => { modal.classList.remove('show'); document.body.style.overflow = ''; }; }
   /*
   function attachZoomHandler(id){
     const el = document.getElementById(id);
