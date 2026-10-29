@@ -60,7 +60,20 @@ function monthLabel(key){ if (!key) return '전체'; const [y,m] = key.split('-'
 function ensureZoomStyles(){
   if (document.getElementById('zoom-style')) return;
   //const css = `.img-zoomed{position:fixed!important;inset:0!important;margin:0!important;background:rgba(0,0,0,.85)!important;object-fit:contain!important;max-width:100vw!important;max-height:100vh!important;width:100vw!important;height:100vh!important;z-index:9999!important;cursor:zoom-out!important}`;
-  const css = `.img-zoomed{position:fixed!important;inset:0!important;margin:0!important;background:rgba(0,0,0,.85)!important;object-fit:contain!important;max-width:100vw!important;max-height:100vh!important;z-index:9999!important;cursor:zoom-out!important}`;
+  //const css = `.img-zoomed{position:fixed!important;inset:0!important;margin:0!important;background:rgba(0,0,0,.85)!important;object-fit:contain!important;max-width:100vw!important;max-height:100vh!important;z-index:9999!important;cursor:zoom-out!important}`;
+  const css = `.img-zoomed{
+    position:fixed!important;
+    inset:0!important;
+    margin:auto!important;
+    width:auto!important;
+    height:auto!important;
+    max-width:95vw!important;
+    max-height:90vh!important;
+    object-fit:contain!important;
+    background:rgba(0,0,0,.85)!important;
+    z-index:9999!important;
+    cursor:zoom-out!important;
+  }`;  
   const s = document.createElement('style'); s.id = 'zoom-style'; s.textContent = css; document.head.appendChild(s);
 }
 async function tryFullscreen(el){
